@@ -1,4 +1,5 @@
-# Utility Classes and Functions for the QT3 Lab
+# Utility Classes and Functions for the Quantum Defect Lab
+Forked from qt3-utils 9/23/2024. References not updated yet -- EQW 9/23/2024
 
 This package provides a number of tools and fully-packaged programs for usage
 in the Quantum Technologies Teaching and Test-Bed (QT3) lab at the University of Washington.
