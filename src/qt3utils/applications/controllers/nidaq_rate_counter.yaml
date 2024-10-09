@@ -13,7 +13,7 @@ QT3PLE:
 
   DAQCounter:
     import_path : qt3utils.applications.controllers.nidaqedgecounter
-    class_name  : QT3ScopeNIDAQEdgeCounterController
+    class_name  : QT3ScanNIDAQEdgeCounterController
     configure :
       daq_name : Dev1  # NI DAQ Device Name
       signal_terminal : PFI0  # NI DAQ terminal connected to input digital TTL signal

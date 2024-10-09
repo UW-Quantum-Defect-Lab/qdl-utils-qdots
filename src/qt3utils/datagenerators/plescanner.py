@@ -163,9 +163,9 @@ class PleScanner:
                 batch_vals = [val]
             elif self.scan_mode == "Batches":
                 self.wavelength_controller.speed = "fast"
-                time.sleep(self.wavelength_controller.settling_time_in_seconds)
                 if ii < len(val_array)-1:
-                    batch_vals = np.arange(val, val_array[ii+1])
+                    batch_step = (val_array[ii+1] - val) / self._discrete_batch_size
+                    batch_vals = np.arange(val, val_array[ii+1], batch_step)
                 else:
                     continue
             for batch_val in batch_vals:
@@ -174,7 +174,7 @@ class PleScanner:
                 scanned_control.append(self.wavelength_controller.get_current_wl_point())
                 batch_output = {key: [] for key in self.readers.keys()}
                 for reader in self.readers:
-                    if isinstance(self.readers[reader], QT3ScopeNIDAQEdgeCounterController):
+                    if isinstance(self.readers[reader], QT3ScanNIDAQEdgeCounterController):
                         self.rate_counters.append(self.readers[reader])
                         raw_counts = []
                         _raw_counts = self.sample_counts(self.readers[reader])
@@ -182,8 +182,8 @@ class PleScanner:
                         logger.info(f'raw counts, total clock samples: {_raw_counts}')
                         if self.wavelength_controller:
                             logger.info(f'current {self.axis_name}: {self.wavelength_controller.get_current_wl_point()}')
-                        raw_counts.append(_raw_counts)
-                        batch_output[reader].append(self.sample_count_rate(reader))
+                        #raw_counts.append(_raw_counts)
+                        batch_output[reader].append(self.sample_count_rate(reader, _raw_counts))
                     if isinstance(self.readers[reader], WavemeterController):
                         _wm_reading = self.read_wavemeter(self.readers[reader])
                         batch_output[reader].append(_wm_reading)
@@ -208,7 +208,7 @@ class PleScanner:
         """
         Get the counts for a batch by sampling the counts from the rate_counter class
         """
-        return reader.sample_counts(reader.num_data_samples_per_batch)
+        return reader.sample_counts(1, self.wavelength_controller.settling_time_in_seconds)
 
     def reset(self) -> None:
         """

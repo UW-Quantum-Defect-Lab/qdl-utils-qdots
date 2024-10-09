@@ -318,7 +318,7 @@ class MainTkApplication():
 
         settling_time = sweep_time_entry / n_sample_size
         downsweep_settling_time = downsweep_time / n_sample_size
-        self.application_controller.settling_time_in_seconds = settling_time
+        self.application_controller.wavelength_controller.settling_time_in_seconds = settling_time
         self.application_controller.downsweep_settling_time_in_seconds = downsweep_settling_time
 
         self.app_meta_data = args
