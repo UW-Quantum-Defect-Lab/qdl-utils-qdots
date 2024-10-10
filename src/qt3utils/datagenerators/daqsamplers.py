@@ -15,7 +15,6 @@ class RateCounterBase(abc.ABC):
     """
     Subclasses must implement a clock_rate attribute or property.
     """
-
     def __init__(self):
         self.running = False
         self.clock_rate = 0
@@ -126,7 +125,7 @@ class RateCounterBase(abc.ABC):
         """
         _data = np.sum(data_counts, axis=0)
         if _data[1] > 0:
-            return self.clock_rate * _data[0] / _data[1]
+            return _data[0]/self.sample_time
         else:
             return np.nan
 
@@ -146,7 +145,6 @@ class RandomRateCounter(RateCounterBase):
     this will simulate a sample with isolated bright spots, like NV centers in diamond and
     is used when testing the CounterAndScanner class in piezoscanner.py module.
     """
-
     def __init__(self, simulate_single_light_source=False, num_data_samples_per_batch=10):
         super().__init__()
         self.default_offset = 100
@@ -154,7 +152,7 @@ class RandomRateCounter(RateCounterBase):
 
         self.current_offset = self.default_offset
         self.current_direction = 1
-        self.clock_rate = 0.9302010  # a totally random number :P
+        self.clock_rate = 0.9302010 # a totally random number :P
         self.simulate_single_light_source = simulate_single_light_source
         self.possible_offset_values = np.arange(5000, 100000, 1000)  # these create the "bright" positions
         self.num_data_samples_per_batch = num_data_samples_per_batch
@@ -173,29 +171,28 @@ class RandomRateCounter(RateCounterBase):
             if np.random.random(1)[0] < 0.05:
                 if np.random.random(1)[0] < 0.1:
                     self.current_direction = -1 * self.current_direction
-                self.current_offset += self.current_direction * np.random.choice(self.possible_offset_values)
+                self.current_offset += self.current_direction*np.random.choice(self.possible_offset_values)
 
             if self.current_offset < self.default_offset:
                 self.current_offset = self.default_offset
                 self.current_direction = 1
 
-        counts = self.signal_noise_amp * self.current_offset * np.random.random(
-            self.num_data_samples_per_batch) + self.current_offset
+        counts = self.signal_noise_amp * self.current_offset * np.random.random(self.num_data_samples_per_batch) + self.current_offset
 
         return counts, self.num_data_samples_per_batch
 
 
 class NiDaqDigitalInputRateCounter(RateCounterBase):
 
-    def __init__(self, daq_name='Dev1',
-                 signal_terminal='PFI0',
-                 clock_rate=10000,
-                 num_data_samples_per_batch=1000,
-                 clock_terminal=None,
-                 read_write_timeout=10,
-                 signal_counter='ctr2',
-                 trigger_terminal=None,
-                 ):
+    def __init__(self, daq_name = 'Dev1',
+                       signal_terminal = 'PFI0',
+                       clock_rate = 10000,
+                       num_data_samples_per_batch = 1000,
+                       clock_terminal = None,
+                       read_write_timeout = 10,
+                       signal_counter = 'ctr2',
+                       trigger_terminal = None,
+                       ):
         super().__init__()
         self.daq_name = daq_name
         self.signal_terminal = signal_terminal
@@ -205,6 +202,7 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
         self.read_write_timeout = read_write_timeout
         self.num_data_samples_per_batch = num_data_samples_per_batch
         self.trigger_terminal = trigger_terminal
+        self.sample_time = 1
 
         self.read_lock = False
 
@@ -212,27 +210,29 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
         self.nidaq_config = qt3utils.nidaq.EdgeCounter(self.daq_name)
 
         if self.clock_terminal is None:
-            self.nidaq_config.configure_di_clock(clock_rate=self.clock_rate)
+            self.nidaq_config.configure_di_clock(clock_rate = self.clock_rate)
             clock_terminal = self.nidaq_config.clock_task_config['clock_terminal']
         else:
             clock_terminal = self.clock_terminal
 
         self.nidaq_config.configure_counter_period_measure(
-            daq_counter=self.signal_counter,
-            source_terminal=self.signal_terminal,
-            N_samples_to_acquire_or_buffer_size=self.num_data_samples_per_batch,
-            clock_terminal=clock_terminal,
-            trigger_terminal=self.trigger_terminal,
-            sampling_mode=nidaqmx.constants.AcquisitionType.FINITE)
+            daq_counter = self.signal_counter,
+            source_terminal = self.signal_terminal,
+            N_samples_to_acquire_or_buffer_size = self.num_data_samples_per_batch,
+            clock_terminal = clock_terminal,
+            trigger_terminal = self.trigger_terminal,
+            sampling_mode = nidaqmx.constants.AcquisitionType.FINITE)
 
         self.nidaq_config.create_counter_reader()
 
     def _read_samples(self):
 
-        if self.running is False:  # external thread could have stopped
-            return np.zeros(1), 0
+        if self.running is False: #external thread could have stopped
+            return np.zeros(1),0
 
-        data_buffer = np.zeros(self.num_data_samples_per_batch)
+        num_samples_per_channel = int(self.sample_time * self.clock_rate)
+        data_buffer = np.zeros(num_samples_per_channel)
+        self.nidaq_config.counter_task.timing.samp_quant_samp_per_chan = num_samples_per_channel
         samples_read = 0
 
         try:
@@ -240,19 +240,12 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
             logger.info('starting counter task')
             self.nidaq_config.counter_task.wait_until_done()
             self.nidaq_config.counter_task.start()
-            # DO WE NEED TO PAUSE HERE FOR DATA ACQUISITION?
-            # another method will probably be to configure the task to continuously fill a buffer and read it
-            # out... then we don't need to start and stop, right? TODO
-            # and, with continuous acquisition, there might not need to be any time.sleep
-            logger.info(
-                f'waiting for {1.1 * self.num_data_samples_per_batch / self.clock_rate:.6f}'
-                f' seconds for data acquisition.')
-            time.sleep(1.1 * self.num_data_samples_per_batch / self.clock_rate)
+
             logger.info('reading data')
             samples_read = self.nidaq_config.counter_reader.read_many_sample_double(
-                data_buffer,
-                number_of_samples_per_channel=self.num_data_samples_per_batch,
-                timeout=self.read_write_timeout)
+                                    data_buffer,
+                                    number_of_samples_per_channel=num_samples_per_channel,
+                                    timeout=self.read_write_timeout)
             logger.info(f'returned {samples_read} samples')
 
         except Exception as e:
@@ -287,17 +280,19 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
     def stop(self):
         if self.running:
             while self.read_lock:
-                time.sleep(0.1)  # wait for current read to complete
+                time.sleep(0.1) # wait for current read to complete
 
             if self.nidaq_config.clock_task:
                 self._burn_and_log_exception(self.nidaq_config.clock_task.stop)
-                self._burn_and_log_exception(
-                    self.nidaq_config.clock_task.close)  # close the task to free resource on NIDAQ
-            # self._burn_and_log_exception(self.nidaq_config.counter_task.stop) # will need to stop task if we move
-            # to continuous buffered acquisition
+                self._burn_and_log_exception(self.nidaq_config.clock_task.close) # close the task to free resource on NIDAQ
+            # self._burn_and_log_exception(self.nidaq_config.counter_task.stop) # will need to stop task if we move to continuous buffered acquisition
             self._burn_and_log_exception(self.nidaq_config.counter_task.close)
 
         self.running = False
 
     def close(self):
         self.stop()
+
+
+
+
