@@ -64,9 +64,10 @@ class ScanImage:
         for ax in self.fig.axes:
             self.fig.delaxes(ax)
         num_readers = len(model.readers)
-        grid = plt.GridSpec(2, num_readers)
+        #grid = plt.GridSpec(2, num_readers)
+        grid = plt.GridSpec(1, num_readers)
         self.update_image(model, grid)
-        self.update_plot(model, grid)
+        #self.update_plot(model, grid)
 
     def update_image(self, model, grid) -> None:
         for ii, reader in enumerate(model.readers):
@@ -84,7 +85,8 @@ class ScanImage:
                                     , extent=[model.current_frame + model.wavelength_controller.settling_time_in_seconds,
                                                                        0.0,
                                                                        model.get_start,
-                                                                       model.get_end + model.step_size])
+                                                                       model.get_end + model.step_size],
+                                      interpolation='none')
             cbar = self.fig.colorbar(artist, ax=ax)
 
             #if self.log_data is False:
