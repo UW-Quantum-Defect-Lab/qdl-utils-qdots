@@ -108,7 +108,7 @@ class VControl(WavelengthControlBase):
                 self.last_write_value = v
             debug_string.append(f'v: {v:.2f}')
         self.logger.info(f'go to voltage {" ".join(debug_string)}')
-        time.sleep(self.settling_time_in_seconds) #wait to ensure piezo actuator has settled into position.
+        #time.sleep(self.settling_time_in_seconds) #wait to ensure piezo actuator has settled into position.
         self.logger.debug(f'last write: {self.last_write_value}')
 
     def _nm_to_volts(self, nm: float) -> float:
