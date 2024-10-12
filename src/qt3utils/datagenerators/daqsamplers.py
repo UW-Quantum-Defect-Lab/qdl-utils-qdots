@@ -240,16 +240,7 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
             logger.info('starting counter task')
             self.nidaq_config.counter_task.wait_until_done()
             self.nidaq_config.counter_task.start()
-<<<<<<< HEAD
-            #DO WE NEED TO PAUSE HERE FOR DATA ACQUISITION?
-            #another method will probably be to configure the task to continuously fill a buffer and read it
-            #out... then we don't need to start and stop, right? TODO
-            #and, with continuous acquisition, there might not need to be any time.sleep
-            #logger.info(f'waiting for {1.1*self.num_data_samples_per_batch / self.clock_rate:.6f} seconds for data acquisition.')
-            #time.sleep(1.1*self.num_data_samples_per_batch / self.clock_rate)
-=======
 
->>>>>>> 6c81ffb6339817887170a0d1f37d6c89bb04d9e0
             logger.info('reading data')
             samples_read = self.nidaq_config.counter_reader.read_many_sample_double(
                                     data_buffer,
