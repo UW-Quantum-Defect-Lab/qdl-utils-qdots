@@ -145,15 +145,106 @@ class PleScanner:
         self.outputs.append(self.scan_axis(self.axis_name, self._start, self._end, self._step_size))
         self.current_frame = self.current_frame + 1
 
-    def scan_axis(self, axis: str, min: float, max: float, step_size: float) -> list:
-        """
+    # OLD VERSION OF THE SCAN AXIS FUNCTION FOR DEBUGGING PURPOSES --- DELETE LATER!
+    def scan_axis_old(self, axis: str, min: float, max: float, step_size: float) -> list:
+        '''
         Moves the wavelength controller from min to max in steps of step_size.
         Returns data in the form of a dictionary with
             keys = name of reader defined in YAML file
             values = output of scan
         As well as an array of the points associated with the scan
         If scan_mode is Discrete, each point will represent average values of batch between points instead
-        """
+        '''
+        output = {key: [] for key in self.readers.keys()}
+        scanned_control = []
+        self.set_to_start()
+        val_array = np.arange(min, max + step_size, step_size)
+        for ii, val in enumerate(val_array):
+            if self.scan_mode == "Discrete":
+                batch_vals = [val]
+            elif self.scan_mode == "Batches":
+                self.wavelength_controller.speed = "fast"
+                if ii < len(val_array)-1:
+                    batch_step = (val_array[ii+1] - val) / self._discrete_batch_size
+                    batch_vals = np.arange(val, val_array[ii+1], batch_step)
+                else:
+                    continue
+            for batch_val in batch_vals:
+                logger.info(f'go to {axis}: {val:.2f}')
+                self.go_to(wl_point=batch_val)
+                scanned_control.append(self.wavelength_controller.get_current_wl_point())
+                batch_output = {key: [] for key in self.readers.keys()}
+                for reader in self.readers:
+                    if isinstance(self.readers[reader], QT3ScanNIDAQEdgeCounterController):
+                        self.rate_counters.append(self.readers[reader])
+                        raw_counts = []
+                        _raw_counts = self.sample_counts(self.readers[reader])
+                        raw_counts.append(_raw_counts)
+                        logger.info(f'raw counts, total clock samples: {_raw_counts}')
+                        if self.wavelength_controller:
+                            logger.info(f'current {self.axis_name}: {self.wavelength_controller.get_current_wl_point()}')
+                        #raw_counts.append(_raw_counts)
+                        batch_output[reader].append(self.sample_count_rate(reader, _raw_counts))
+                    if isinstance(self.readers[reader], WavemeterController):
+                        _wm_reading = self.read_wavemeter(self.readers[reader])
+                        batch_output[reader].append(_wm_reading)
+                        if self.wavelength_controller:
+                            logger.info(f'current {self.axis_name}: {self.wavelength_controller.get_current_wl_point()}')
+                    if isinstance(self.readers[reader], VControl):
+                        v_reading = self.readers[reader].get_current_wl_point()
+                        batch_output[reader].append(v_reading)
+                    if isinstance(self.readers[reader], Lockin):
+                        signal_reading = self.readers[reader].read()
+                        batch_output[reader].append(signal_reading)
+            for reader in self.readers:
+                reader_batch = np.array(batch_output[reader])
+                if len(reader_batch.shape) == 1:
+                    output[reader].append(np.mean(batch_output[reader]))
+                else:
+                    output[reader].append(batch_output[reader][-1])
+        self.scanned_control.append(scanned_control)
+        return output
+    
+    def scan_axis(self, 
+                  axis: str, 
+                  min: float, 
+                  max: float, 
+                  n_pixels_up: int, 
+                  n_pixels_down: int, 
+                  n_subpixels: int) -> list:
+        '''
+        THIS IS AN UPDATED VERSION -- NICK 13 OCTOBER 2023
+        IT IS INCOMPATABLE WITH THE PREVIOUS IMPLEMENTATION
+
+        This function sweeps the voltage between `min` -> `max` -> `min`
+        collecting data at `n_pixels_up` points on the `min` -> `max`
+        sweep and then `n_pixels_down` points on the `max` -> `min` sweep.
+
+        Within each pixel, the votltage is swept over `n_subpixels` intermidate
+        points to ensure roughly continuous scanning of the voltage frequency.
+        Data at the intermediate points are binned (summed together) and the
+        resulting value is representative of the corresponding point at the start
+        of the bin window.
+
+        As an example, suppose we have the following inputs
+                min: 0, 
+                max: 1, 
+                n_pixels_up: 4, 
+                n_pixels_down: 2, 
+                n_subpixels: 2
+        We have on the upsweep:
+            Data recorded at: [0,        0.25,         0.50, 0.75]
+                              |          |             |
+            Subpixel samples: [0, 0.125, 0.250, 0.375, ...]
+            
+        Likewise on the down sweep we have
+            Data recorded at: [1,       0.5       ]
+                              |         |            
+            Subpixel samples: [1, 0.75, 0.50, 0.25]
+
+
+        
+        '''
         output = {key: [] for key in self.readers.keys()}
         scanned_control = []
         self.set_to_start()
