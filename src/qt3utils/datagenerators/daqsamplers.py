@@ -104,7 +104,7 @@ class RateCounterBase(abc.ABC):
             if samples_read > 0:
                 data[i][0] = np.sum(data_sample[:samples_read])
             data[i][1] = samples_read
-            logger.info(f'batch data (sum counts, num clock cycles per batch): {data[i]}')
+            logger.debug(f'batch data (sum counts, num clock cycles per batch): {data[i]}')
 
         if sum_counts:
             return np.sum(data, axis=0, keepdims=True)
@@ -237,16 +237,16 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
 
         try:
             self.read_lock = True
-            logger.info('starting counter task')
+            logger.debug('starting counter task')
             self.nidaq_config.counter_task.wait_until_done()
             self.nidaq_config.counter_task.start()
 
-            logger.info('reading data')
+            logger.debug('reading data')
             samples_read = self.nidaq_config.counter_reader.read_many_sample_double(
                                     data_buffer,
                                     number_of_samples_per_channel=num_samples_per_channel,
                                     timeout=self.read_write_timeout)
-            logger.info(f'returned {samples_read} samples')
+            logger.debug(f'returned {samples_read} samples')
 
         except Exception as e:
             logger.error(f'{type(e)}: {e}')
