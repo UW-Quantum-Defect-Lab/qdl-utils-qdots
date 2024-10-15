@@ -423,7 +423,6 @@ class MainTkApplication():
         '''
         
         try:
-            self.application_controller.reset()  # clears the data
             self.application_controller.start()  # starts the DAQ
 
             while self.application_controller.still_scanning():
