@@ -13,10 +13,10 @@ class WavelengthControlBase(abc.ABC):
     def __init__(self, device_name: str,
                  write_channel: str = 'ao0',
                  read_channel: str = None,
-                 scale_nm_per_volt: float = 8,
+                 scale_nm_per_volt: float = 1,
                  move_settle_time: float = 0.001,
-                 min_position: float = 0.0,
-                 max_position: float = 80.0) -> None:
+                 min_position: float = -5.0,
+                 max_position: float = 5.0) -> None:
         super().__init__()
 
         self.logger = logging.getLogger(__name__)
@@ -117,3 +117,96 @@ class VControl(WavelengthControlBase):
     def _volts_to_nm(self, volts: float) -> float:
         return self.scale_nm_per_volt * volts
 
+
+
+
+
+
+
+
+class ArbitraryDAQVoltageController:
+    '''
+    A class to control the voltage output from an NIDAQ with non-specific usage.
+    This class is effectively VControl(WavelengthControlBase) defined above but
+    without specific reference to wavelength.
+    '''
+
+    def __init__(self, device_name: str,
+                 write_channel: str = 'ao0',
+                 read_channel: str = None,
+                 move_settle_time: float = 0.0,
+                 min_voltage: float = -5.0,
+                 max_voltage: float = 5.0) -> None:
+        super().__init__()
+
+        self.logger = logging.getLogger(__name__)
+        self.device_name = device_name
+        self.write_channel = write_channel
+        self.read_channel = read_channel
+        self.minimum_allowed_voltage = min_voltage
+        self.maximum_allowed_voltage = max_voltage
+        self._settling_time_in_seconds = move_settle_time
+        self.last_write_value = None
+
+    def configure(self, config_dict: dict) -> None:
+        '''
+        This method is used to configure the data controller.
+        '''
+        self.device_name = config_dict.get('daq_name', self.device_name)
+        self.write_channel = config_dict.get('write_channels', self.write_channel)
+        self.read_channel = config_dict.get('read_channels', self.read_channel)
+        self.minimum_allowed_voltage = config_dict.get('min_voltage', self.minimum_allowed_voltage)
+        self.maximum_allowed_voltage = config_dict.get('max_voltage', self.maximum_allowed_voltage)
+
+    def get_current_voltage(self) -> float:
+        '''
+        Returns the voltage supplied to the three input analog channels.
+        If no input analog channels were provided when objected was created,
+        returns np.nan
+        '''
+        output = np.nan
+        if self.read_channel is not None:
+            with nidaqmx.Task() as vread, nidaqmx.Task():
+                vread.ai_channels.add_ai_voltage_chan(self.device_name + '/' + self.read_channel, min_val=0, max_val=10.0)
+                output = vread.read()
+
+        return output
+
+    def check_allowed_limits(self, v: float = None) -> None:
+        if v is not None: self._validate_value(v)
+
+    def _validate_value(self, voltage: float) -> None:
+        voltage = float(voltage)
+        if type(voltage) not in [type(1.0), type(1)]:
+            raise TypeError(f'value {voltage} is not a valid type.')
+        if voltage < self.minimum_allowed_voltage:
+            raise ValueError(f'value {voltage} is less than {self.minimum_allowed_voltage: .3f}.')
+        if voltage > self.maximum_allowed_voltage:
+            raise ValueError(f'value {voltage} is greater than {self.maximum_allowed_voltage: .3f}.')
+
+
+    def go_to(self, v: float = None) -> None:
+        '''
+        Sets the voltage
+        raises ValueError if trying to set position out of bounds.
+        '''
+        debug_string = []
+        if v is not None:
+            self._validate_value(v)
+            with nidaqmx.Task() as task:
+                task.ao_channels.add_ao_voltage_chan(self.device_name + '/' + self.write_channel)
+                task.write(v)
+                self.last_write_value = v
+            debug_string.append(f'v: {v:.2f}')
+        self.logger.debug(f'go to voltage {" ".join(debug_string)}')
+        # Wait at new position if desired
+        if time > 0:
+            time.sleep(self.settling_time_in_seconds)
+        self.logger.debug(f'last write: {self.last_write_value}')
+
+    @property
+    def settling_time_in_seconds (self):
+        return self._settling_time_in_seconds
+    @settling_time_in_seconds.setter
+    def settling_time_in_seconds (self, val):
+        self._settling_time_in_seconds = val

@@ -230,16 +230,13 @@ class SidePanel():
         self.subpixel_entry = tk.Entry(settings_frame, width=10)
         self.subpixel_entry.insert(10, 4)
         self.subpixel_entry.grid(row=row, column=1)
-        # Button to enable repump at start of scan? <- NEED TO IMPLEMENT TODO
+        # Button to enable repump at start of scan?
         row += 1
-        self.do_repump = tk.IntVar(value=0)
-        tk.Label(settings_frame, text="Repump").grid(row=row, column=0)
-        self.downsweep_button = tk.Checkbutton(settings_frame, 
-                                               text="", 
-                                               onvalue=1, 
-                                               offvalue=0,
-                                               variable=self.do_repump)
-        self.downsweep_button.grid(row=row, column=1)
+        tk.Label(settings_frame, text="Reump time (ms)").grid(row=row, column=0)
+        self.repump_entry = tk.Entry(settings_frame, width=10)
+        self.repump_entry.insert(10, 0)
+        self.repump_entry.grid(row=row, column=1)
+
 
         # Define control frame to modify DAQ settings
         control_frame = tk.Frame(base_frame)
@@ -391,6 +388,7 @@ class MainTkApplication():
         time_up = float(self.view.sidepanel.upsweep_time_entry.get())
         time_down = float(self.view.sidepanel.downsweep_time_entry.get())
         n_subpixels = int(self.view.sidepanel.subpixel_entry.get())
+        time_repump = float(self.view.sidepanel.repump_entry.get())
 
         # Configure the scanner
         self.application_controller.configure_scan(
@@ -401,7 +399,8 @@ class MainTkApplication():
                     n_subpixels = n_subpixels,
                     time_up = time_up,
                     time_down = time_down,
-                    n_scans = n_scans)
+                    n_scans = n_scans,
+                    time_repump = time_repump)
 
         # Launch the thread
         self.app_meta_data = args
@@ -466,29 +465,53 @@ class MainTkApplication():
                 pickle.dump(data, f)
 
     def configure_from_yaml(self, afile=None) -> None:
-        """
-        This method launches a GUI window to allow the user to select a yaml file to configure the data controller.
-        Or it loads a specified configuration yaml file.
-        It will attempt to configure the hardware specified in the configuration file and instantiate a controller class
-        """
+        '''
+        This method loads a YAML file to configure the hardware for PLE.
+        If argument `afile` is provided and points to a valid YAML file,
+        the file is loaded directly.
+
+        If `afile` is not provided (default) then this method opens a GUI
+        for the user to select a YAML file.
+        
+        The current version of this method attempts to configure the
+        controller classes and instantiate the application controller.
+        Future modifications will instead save the configuration to the 
+        current top-level application (MainTkApplication) and then 
+        instantiate classes as needed.
+        '''
+        # Specify the allowed filetypes (.yaml)
         filetypes = (
             ('YAML', '*.yaml'),
         )
+        # If a file is not supplied...
         if not afile:
+            # Open a GUI to get the file from the user
             afile = tk.filedialog.askopenfile(filetypes=filetypes, defaultextension='.yaml')
             if afile is None:
                 return  # selection was canceled.
+            # Log selection
+            logger.info(f"Loading settings from: {afile}")
+            # Retrieve the file in a dictionary `config`
             config = yaml.safe_load(afile)
             afile.close()
         else:
+            # Else, open the provided file and load the YAML
+            # Currently there is no protection against invalid YAML configs
             with open(afile, 'r') as file:
+                # Log selection
+                logger.info(f"Loading settings from: {afile}")
                 config = yaml.safe_load(file)
 
+        # At this point the `config` variable is a dictionary of 
+        # nested dictionaries corresponding to each indent level in the YAML.
+        # First we get the top level application name, e.g. "QT3PLE"
         CONFIG_FILE_APPLICATION_NAME = list(config.keys())[0]
 
+        # Now retrieve the application controller configuration
         self.app_controller_config = config[CONFIG_FILE_APPLICATION_NAME]["ApplicationController"]
+
         self.app_config = self.app_controller_config["configure"]
-        logger.info("loading settings from yaml")
+        
         daq_readers = self.app_config["readers"]["daq_readers"]
         self.meta_configs = []
         self.data_acquisition_models = {}
@@ -502,17 +525,7 @@ class MainTkApplication():
                 cls = getattr(module, daq_reader_config['class_name'])
                 self.data_acquisition_models[daq_reader_name] = cls(logger.level)
                 self.data_acquisition_models[daq_reader_name].configure(daq_reader_config['configure'])
-        wm_readers = self.app_config["readers"]["wm_readers"]
-        if wm_readers is not None:
-            for wm_reader in wm_readers:
-                wm_reader_name = wm_readers[wm_reader]
-                wm_reader_config = config[CONFIG_FILE_APPLICATION_NAME][wm_reader_name]
-                self.meta_configs.append(wm_reader_config)
-                module = importlib.import_module(wm_reader_config['import_path'])
-                logger.debug(f"loading {wm_reader_config['import_path']}")
-                cls = getattr(module, wm_reader_config['class_name'])
-                self.data_acquisition_models[wm_reader_name] = cls(logger.level)
-                self.data_acquisition_models[wm_reader_name].configure(wm_reader_config['configure'])
+
         daq_controller_name = config[CONFIG_FILE_APPLICATION_NAME]['ApplicationController']['configure']['controllers']['daq_writers']['daq_writer']
         daq_controller_config = config[CONFIG_FILE_APPLICATION_NAME][daq_controller_name]
         self.meta_configs.append(daq_controller_config)

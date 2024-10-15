@@ -26,13 +26,29 @@ class PleScanner:
         simultaneous processing will require additional development at this time.
     '''
 
-    def __init__(self, readers: dict, wavelength_controller: WavelengthControlBase) -> None:
-
+    def __init__(self, 
+                 readers: dict, 
+                 wavelength_controller: WavelengthControlBase,
+                 extra_controllers: dict = {}) -> None:
+        '''
+        Args:
+            readers                 :   Dictionary of data generators, class can be arbitrary
+                                        but should be used to collect data on each scan.
+                                        Later implementations may split this into a principal
+                                        reader (to control timing) and sub-readers for
+                                        additional data collection.
+            wavelength_controller   :   Wavelength controller class inheriting from
+                                        qt3utils.nidaq.customcontrollers.WavelengthControlBase
+            extra_controllers       :   A dictionary of additional controllers of arbitrary
+                                        class. Use this to pass additional controllers for
+                                        intermidiate steps such as pulse sequencing.
+                                        A basic form of unconditional repump is implemented here.
+        
+        '''
         # Store the readers and wavelength controller
-        # Readers are the classes which generate data
-        # The wavelength controller drives the wavelength position (can be arbitrary)
         self.readers = readers
         self.wavelength_controller = wavelength_controller
+        self.extra_controllers = extra_controllers
         
         # Control variables for system state
         self.running = False
@@ -48,6 +64,7 @@ class PleScanner:
         self.time_up = None                 # Time for upsweep in seconds
         self.time_down = None               # Time for downsweep in seconds
         self.n_scans = None                 # Max number of scans to perform
+        self.time_repump = None             # Time for repump in miliseconds
         # Calculated parameters 
         self.pixel_step_size_up = None      # Voltage per pixel on upsweep
         self.pixel_step_size_down = None    # Voltage per pixel on downsweep
@@ -119,7 +136,8 @@ class PleScanner:
                        n_subpixels: int,
                        time_up: float,
                        time_down: float,
-                       n_scans: int) -> list:
+                       n_scans: int,
+                       time_repump: float) -> list:
         '''
         This function configures the PleScanner scan properties.
 
@@ -230,6 +248,9 @@ class PleScanner:
         # Check if the number of scans is valid
         if type(n_scans) is not int or n_scans < 1:
             raise ValueError(f'Requested # of scans {n_scans} is invalid (must be at least 1).')
+        # Check if repump time is valid
+        if time_repump < 0:
+            raise ValueError(f'Requested repump time {time_repump} is invalid (must be non-negative).')
 
         # If all valid, set the class instance variables
         self.min = min
@@ -240,6 +261,7 @@ class PleScanner:
         self.time_up = time_up
         self.time_down = time_down
         self.n_scans = n_scans
+        self.time_repump = time_repump
 
         # Calculate and save the secondary class instance variables
         # Calculate the step sizes for output value readings
@@ -332,6 +354,12 @@ class PleScanner:
         # Define a dictionary to store the raw outputs at each voltage sample.
         raw_output_at_samples_up = {key: [] for key in self.readers.keys()}
         raw_output_at_samples_down = {key: [] for key in self.readers.keys()}
+
+        # Perform the repump (checking at 0.01 us to avoid floating point error)
+        # If operating with faster switches for repump, limit can be modified
+        if self.time_repump > 0.00001:
+            # Perform the repump
+            self.repump()
 
         # Log start of upsweep
         logger.info(f'Starting upsweep on scan {self.current_frame+1}.')
@@ -432,3 +460,30 @@ class PleScanner:
                 output[reader] = np.concatenate([counts_per_second_up, counts_per_second_down])
 
         return output
+
+    def repump(self):
+        '''
+        Basic implementation of a repump pulse using the analog voltage output
+        of nidaq to switch a laser through an AOM.
+
+        Current implementation expects an entry in the `self.extra_controllers`
+        dictionary with key 'repump' that is of class 
+        `qt3ple.nidaq.customcontrollers.ArbitraryDAQVoltageController`
+
+        The `min_voltage` and `max_voltage` attributes define the off/on voltages
+        of the repump laser respectively. Polarity can be swapped by modifying 
+        the code directly. Timing is controlled by the imprecise time module.
+
+        Generic modifications to the PLE code should implement functions of this
+        type with reference to specific entries in the `extra_controllers` dict.
+        '''
+        # Get the repump controller
+        repump_controller = self.extra_controllers['repump']
+        # Log repump
+        logger.info(f'Repump for {self.time_repump} ms')
+        # Turn on the pump laser
+        repump_controller.go_to(v=repump_controller.max_voltage)
+        # Wait for repump time
+        time.sleep(self.time_repump)
+        # Turn off the pump laser
+        repump_controller.go_to(v=repump_controller.min_voltage)
