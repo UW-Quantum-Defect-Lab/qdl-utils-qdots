@@ -14,6 +14,7 @@ import tkinter as tk
 import yaml
 
 from qt3utils.datagenerators import plescanner
+from qt3utils.applications.controllers.nidaqedgecounter import QT3ScanNIDAQEdgeCounterController
 
 matplotlib.use('Agg')
 
@@ -77,29 +78,52 @@ class ScanImage:
         '''
         Updates image data in the ScanImage GUI element
         '''
-        for ii, reader in enumerate(model.readers):
-            y_data = []
-            for output in model.outputs:
-                y_scan = output[reader]
-                if isinstance(y_scan[0], list) or isinstance(y_scan[0], np.ndarray):
-                    for jj, ydatum in enumerate(y_scan):
-                        y_scan[jj] = np.mean(np.array(ydatum))
-                y_data.append(y_scan)
+        # Quick fix to get it to run
+        img_data = np.array([[]])
 
-            ax = self.fig.add_subplot(grid[0, ii])
-            y_data = np.array(y_data).T
-            artist = ax.imshow(y_data,
-                               cmap=self.cmap, 
-                               extent=[model.current_frame + model.wavelength_controller.settling_time_in_seconds,
-                                            0.0,
-                                            model.get_start,
-                                            model.get_end + model.step_size],
-                               interpolation='none',
-                               aspect='auto')
-            cbar = self.fig.colorbar(artist, ax=ax)
+        # Look for the single DAQ reader and get the image data
+        for reader in model.readers:
+            if isinstance(model.readers[reader], QT3ScanNIDAQEdgeCounterController):
+                img_data = np.array([output[reader] for output in model.outputs])
 
-            self.ax.set_xlabel('Pixels')
-            self.ax.set_ylabel('Voltage (V)')
+        # Calculate the axis extent
+        # Want to assign y axis values 0 -> 1 on the upscan, then 1 -> y_max on
+        # the downscan. Because imshow scales all samples uniformly, we need
+        # (y_max - 1) / 1 = n_pixels_down / n_pixels_up
+        y_max = 1 + model.n_pixels_down / model.n_pixels_up
+
+        # Plot the scan
+        ax = self.fig.add_subplot()
+        artist = ax.imshow(
+                        img_data.T,
+                        cmap=self.cmap, 
+                        extent=[0.5,
+                                img_data.shape[0]+0.5,
+                                0,
+                                y_max],
+                        interpolation='none',
+                        aspect='auto',
+                        origin='lower')
+        cbar = self.fig.colorbar(artist, ax=ax)
+
+        # Set the tick labels
+        ax.set_xticks( np.arange(1,img_data.shape[0]+1,1) ) # Set the xticks on integer values
+        y_ticks = ax.get_yticks()
+        ax.set_yticks( y_ticks, self.calculate_ytick_labels(y_ticks, model.min, model.max, y_max) ) # Set the yticks to match scan
+        # Reset the extent
+        ax.set_ylim(0,y_max)
+        # Set the labels
+        ax.set_xlabel('Scan number', fontsize=14)
+        ax.set_ylabel('Voltage (V)', fontsize=14)
+        cbar.ax.set_ylabel('Counts/sec', fontsize=14, rotation=270, labelpad=15)
+        # Set the grid
+        ax.grid(alpha=0.3, axis='y', linewidth=1, color='w', dashes=(5,5))
+
+    def calculate_ytick_labels(self, y, y_min, y_max, max_tick):
+        '''
+        Method to compute the ytick labels
+        '''
+        return np.round(np.where(y > 1, (y_min-y_max)*(y-max_tick)/(max_tick-1)+y_min, (y_max-y_min)*y+y_min), decimals=3)
 
     def update_plot(self, model, grid) -> None:
         '''
@@ -136,7 +160,6 @@ class SidePanel():
         base_frame = tk.Frame(root.root)
         base_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-
         # Define command frame for start/stop/save buttons
         command_frame = tk.Frame(base_frame)
         command_frame.pack(side=tk.TOP, padx=20, pady=10)
@@ -150,7 +173,6 @@ class SidePanel():
         self.stop_button.grid(row=row, column=1, columnspan=1, padx=3)
         self.save_scan_button = tk.Button(command_frame, text="Save Scan", width=12)
         self.save_scan_button.grid(row=row, column=2, columnspan=1, padx=3)
-
 
         # Define settings frame to set all scan settings
         settings_frame = tk.Frame(base_frame)
@@ -197,24 +219,16 @@ class SidePanel():
         self.downsweep_time_entry = tk.Entry(settings_frame, width=10)
         self.downsweep_time_entry.insert(10, 1)
         self.downsweep_time_entry.grid(row=row, column=1, padx=10)
-
-        '''
-        # Removing the downsweep enable for now
-        # Need to modify the sweep code to account for this!!!
-
-        self.downsweep_time_entry.config(state=tk.DISABLED)
-        self.downsweep_button = tk.Checkbutton(frame, text="Downsweep", onvalue=1, offvalue=0,
-                                               variable=self.do_downsweep, command=self.display_downsweep_time)
-        self.downsweep_button.grid(row=row, column=2)'''
-
-        
         # Adding advanced settings --- probably want it to be a pop-out menu? Maybe not if the image is separated
         row += 1
         tk.Label(settings_frame, text="Advanced settings:", font='Helvetica 10').grid(row=row, column=0, pady=[5,0], columnspan=3)
+        # Number of subpixels to sample (each pixel has this number of samples)
+        # Note that excessively large values will slow the scan speed down due to
+        # the voltage movement overhead.
         row += 1
         tk.Label(settings_frame, text="# of sub-pixels").grid(row=row, column=0)
         self.subpixel_entry = tk.Entry(settings_frame, width=10)
-        self.subpixel_entry.insert(10, 16)
+        self.subpixel_entry.insert(10, 4)
         self.subpixel_entry.grid(row=row, column=1)
         # Button to enable repump at start of scan? <- NEED TO IMPLEMENT TODO
         row += 1
@@ -226,19 +240,6 @@ class SidePanel():
                                                offvalue=0,
                                                variable=self.do_repump)
         self.downsweep_button.grid(row=row, column=1)
-
-        '''
-        # Commenting this out for now, intention is to always have sub-pixel scanning
-        row += 1
-        tk.Label(frame, text="Mode").grid(row=row, column=0)
-        self.scan_mode = tk.StringVar()
-        self.scan_mode.set("Discrete")
-        self.scan_options = tk.OptionMenu(frame, self.scan_mode, *SCAN_OPTIONS, command=self.display_batch_entry)
-        self.scan_options.grid(row=row, column=1)
-        self.batch_entry = tk.Entry(frame, width=10)
-        self.batch_entry.insert(10, 1)
-        self.batch_entry.grid(row=row, column=2)
-        self.batch_entry.config(state=tk.DISABLED)'''
 
         # Define control frame to modify DAQ settings
         control_frame = tk.Frame(base_frame)
@@ -253,13 +254,6 @@ class SidePanel():
         self.voltage_entry = tk.Entry(control_frame, width=10)
         self.voltage_entry.insert(10, 0)
         self.voltage_entry.grid(row=row, column=1, padx=10)
-
-        '''
-        # Plan to remove goto_slow functionality
-
-        self.goto_slow_button = tk.Button(frame, text="Slowly go to scanning parameter")
-        self.goto_slow_button.grid(row=row, column=1)
-        '''
         # Getter for the voltage (based off of the latest set value)
         row += 1
         self.get_button = tk.Button(control_frame, text="Get voltage (V)", width=12)
@@ -269,58 +263,14 @@ class SidePanel():
         self.voltage_show.grid(row=row, column=1)
         self.voltage_show.config(state='readonly') # Disable the voltage show
 
-
-        '''
-        # I don't think we need to set this here? Should be defined in the YAML file
-        
-        row += 1
-        tk.Label(control_frame, text="Scan Limits").grid(row=row, column=0)
-        self.voltage_lmin_entry = tk.Entry(control_frame, width=10)
-        self.voltage_lmax_entry = tk.Entry(control_frame, width=10)
-        self.voltage_lmin_entry.insert(10, float(scan_range[0]))
-        self.voltage_lmax_entry.insert(10, float(scan_range[1]))
-        self.voltage_lmin_entry.grid(row=row, column=1)
-        self.voltage_lmax_entry.grid(row=row, column=2)
-'''
         # Define config frame to set the config file
         config_frame = tk.Frame(base_frame)
         config_frame.pack(side=tk.TOP, padx=20, pady=10)
         tk.Label(config_frame, text="Hardware Configuration", font='Helvetica 14').grid(row=row, column=0, pady=[0,5], columnspan=1)
-        '''
-        # Probably don't need this?
-        
-        row+=1
-        self.controller_option = tk.StringVar(config_frame)
-        self.controller_option.set(DEFAULT_DAQ_DEVICE_NAME)  # setting the default value
-
-        self.controller_menu = tk.OptionMenu(config_frame,
-                                             self.controller_option,
-                                             *STANDARD_CONTROLLERS.keys(),
-                                             command=root.load_controller_from_name)
-
-        self.controller_menu.grid(row=row, column=0, columnspan=3)
-        '''
         # Dialouge button to pick the YAML config
         row += 1
         self.hardware_config_from_yaml_button = tk.Button(config_frame, text="Load YAML Config")
         self.hardware_config_from_yaml_button.grid(row=row, column=0, columnspan=1)
-
-
-
-    '''
-    # Plan to remove the separated batch and downsweep so commenting out here
-
-    def display_batch_entry(self, scan_mode):
-        if scan_mode == "Batches":
-            self.batch_entry.config(state=tk.NORMAL)
-        else:
-            self.batch_entry.config(state=tk.DISABLED)
-
-    def display_downsweep_time(self):
-        if self.do_downsweep.get() == 1:
-            self.downsweep_time_entry.config(state=tk.NORMAL)
-        else:
-            self.downsweep_time_entry.config(state=tk.DISABLED)'''
 
 
 
@@ -343,6 +293,7 @@ class MainApplicationView():
         self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
         self.canvas.draw()
+
 
 class MainTkApplication():
     '''
@@ -368,7 +319,8 @@ class MainTkApplication():
         self.root = tk.Tk()
         # Create the main application GUI and specify the controller name
         self.view = MainApplicationView(self, 
-                                        scan_range=[self.application_controller._start, self.application_controller._end])
+                                        scan_range=[self.application_controller.wavelength_controller.minimum_allowed_position, 
+                                                    self.application_controller.wavelength_controller.maximum_allowed_position])
         self.view.controller_option = controller_name
 
         # Bind the GUI buttons to callback functions
@@ -429,31 +381,31 @@ class MainTkApplication():
         locking up the GUI during the scan.
         '''
         self.disable_buttons()
-        # Get the scan parameters from the GUI
-        n_subpixels_size = int(self.view.sidepanel.subpixel_entry.get())
-        n_sample_size = int(self.view.sidepanel.num_pixels_up_entry.get())
-        n_sample_size = int(self.view.sidepanel.num_pixels_down_entry.get())
-        n_scans = int(self.view.sidepanel.scan_num_entry.get())
-        sweep_time_entry = float(self.view.sidepanel.upsweep_time_entry.get())
-        downsweep_time = float(self.view.sidepanel.downsweep_time_entry.get())
-        vstart= float(self.view.sidepanel.voltage_start_entry.get())
-        vend = float(self.view.sidepanel.voltage_end_entry.get())
-        step_size = (vend - vstart) / float(n_sample_size)
-        args = [vstart, vend]
-        args.append(step_size)
-        args.append(n_sample_size)
-        args.append(n_scans)
-        args.append(n_subpixels_size)
 
-        # Calculate the parameters for the sweep
-        settling_time = sweep_time_entry / n_sample_size
-        downsweep_settling_time = downsweep_time / n_sample_size
-        self.application_controller.wavelength_controller.settling_time_in_seconds = settling_time
-        self.application_controller.downsweep_settling_time_in_seconds = downsweep_settling_time
+        # Get the scan parameters from the GUI
+        min_voltage = float(self.view.sidepanel.voltage_start_entry.get())
+        max_voltage = float(self.view.sidepanel.voltage_end_entry.get())
+        n_pixels_up = int(self.view.sidepanel.num_pixels_up_entry.get())
+        n_pixels_down = int(self.view.sidepanel.num_pixels_down_entry.get())
+        n_scans = int(self.view.sidepanel.scan_num_entry.get())
+        time_up = float(self.view.sidepanel.upsweep_time_entry.get())
+        time_down = float(self.view.sidepanel.downsweep_time_entry.get())
+        n_subpixels = int(self.view.sidepanel.subpixel_entry.get())
+
+        # Configure the scanner
+        self.application_controller.configure_scan(
+                    min = min_voltage, 
+                    max = max_voltage, 
+                    n_pixels_up = n_pixels_up, 
+                    n_pixels_down = n_pixels_down, 
+                    n_subpixels = n_subpixels,
+                    time_up = time_up,
+                    time_down = time_down,
+                    n_scans = n_scans)
 
         # Launch the thread
         self.app_meta_data = args
-        self.scan_thread = Thread(target=self.scan_thread_function, args=args)
+        self.scan_thread = Thread(target=self.scan_thread_function)
         self.scan_thread.start()
 
     def stop_scan(self, event=None) -> None:
@@ -463,37 +415,23 @@ class MainTkApplication():
         self.application_controller.stop()
         self.enable_buttons()
 
-    def scan_thread_function(self,
-                             vstart: float,
-                             vend: float,
-                             step_size: float,
-                             n_sample_size: int,
-                             n_scans: int,
-                             scan_mode: str,
-                             batch_size: int) -> None:
+    def scan_thread_function(self) -> None:
         '''
         Function to be called in background thread.
 
-        Scans the voltage from vstart to vend in increments of step_size
-        for a total of n_sample_size data points n_scans number of times.
-        If the scan_mode is "Batches", it will aggregate (average) some
-        batch_size number of points in between data points instead.
+        Runs the scans and updates the figure.
         '''
-        self.application_controller.set_scan_mode(scan_mode)
-        self.application_controller.discrete_batch_size = batch_size
-        self.application_controller.set_scan_range(vstart, vend)
-        self.application_controller.step_size = step_size
-        self.application_controller.tmax = n_scans
+        
         try:
             self.application_controller.reset()  # clears the data
             self.application_controller.start()  # starts the DAQ
-            self.application_controller.set_to_start()  # moves the stage to starting voltage
 
             while self.application_controller.still_scanning():
                 self.application_controller.scan_wavelengths()
                 self.view.scan_view.update_image_and_plot(self.application_controller)
                 self.view.canvas.draw()
 
+            logger.info('Scan complete.')
             self.application_controller.stop()
 
         except nidaqmx.errors.DaqError as e:
@@ -551,7 +489,7 @@ class MainTkApplication():
 
         self.app_controller_config = config[CONFIG_FILE_APPLICATION_NAME]["ApplicationController"]
         self.app_config = self.app_controller_config["configure"]
-        logger.info("load settings from yaml")
+        logger.info("loading settings from yaml")
         daq_readers = self.app_config["readers"]["daq_readers"]
         self.meta_configs = []
         self.data_acquisition_models = {}

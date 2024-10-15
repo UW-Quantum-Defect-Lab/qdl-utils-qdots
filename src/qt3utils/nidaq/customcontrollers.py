@@ -107,7 +107,7 @@ class VControl(WavelengthControlBase):
                 task.write(self._nm_to_volts(nm=v))
                 self.last_write_value = v
             debug_string.append(f'v: {v:.2f}')
-        self.logger.info(f'go to voltage {" ".join(debug_string)}')
+        self.logger.debug(f'go to voltage {" ".join(debug_string)}')
         #time.sleep(self.settling_time_in_seconds) #wait to ensure piezo actuator has settled into position.
         self.logger.debug(f'last write: {self.last_write_value}')
 
@@ -116,55 +116,4 @@ class VControl(WavelengthControlBase):
 
     def _volts_to_nm(self, volts: float) -> float:
         return self.scale_nm_per_volt * volts
-
-
-class VControlWavelength(WavelengthControlBase):
-
-    def go_to(self, wl_point: float = None) -> None:
-        '''
-        Sets the voltage
-        raises ValueError if try to set voltage out of bounds.
-        '''
-        if self.speed == "normal" or self.speed == "fast":
-            self.go_to_voltage(wl_point)
-        else:
-            self.go_to_voltage_slowly(wl_point)
-
-    def go_to_voltage(self, v: float = None) -> None:
-        '''
-        !//Sets the voltage
-        raises ValueError if try to set position out of bounds.
-        '''
-        debug_string = []
-        if v is not None:
-            self._validate_value(v)
-            with nidaqmx.Task() as task:
-                task.ao_channels.add_ao_voltage_chan(self.device_name + '/' + self.write_channel)
-                task.write(v)
-                self.last_write_value = v
-            debug_string.append(f'v: {v:.2f}')
-        self.logger.info(f'go to voltage {" ".join(debug_string)}')
-        if not self.speed == "fast":
-            time.sleep(self.settling_time_in_seconds) #wait to ensure voltage has settled into position.
-        self.logger.debug(f'last write: {self.last_write_value}')
-
-    def go_to_voltage_slowly(self, v: float = None) -> None:
-        debug_string = []
-        step_size_slow = 0.2
-        if v is not None:
-            self._validate_value(v)
-            with nidaqmx.Task() as task:
-                task.ao_channels.add_ao_voltage_chan(self.device_name + '/' + self.write_channel)
-                while abs(v-self.last_write_value) > step_size_slow:
-                    current_v=self.last_write_value + step_size_slow * np.sign(v-self.last_write_value)
-                    task.write(current_v)
-                    self.last_write_value = current_v
-                    time.sleep(self.settling_time_in_seconds)
-                task.write(v)
-                self.last_write_value = v
-            debug_string.append(f'v: {v:.2f}')
-        self.logger.info(f'go to voltage {" ".join(debug_string)}')
-        time.sleep(self.settling_time_in_seconds)  # wait to ensure piezo actuator has settled into position.
-        self.logger.debug(f'last write: {self.last_write_value}')
-
 
