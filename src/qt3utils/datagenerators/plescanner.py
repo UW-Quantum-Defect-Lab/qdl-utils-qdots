@@ -487,3 +487,13 @@ class PleScanner:
         time.sleep(self.time_repump * 0.001)
         # Turn off the pump laser
         repump_controller.go_to(v=repump_controller.minimum_allowed_voltage)
+
+
+    def __del__(self):
+        '''
+        This function is called by Python when the application_controller instance
+        is terminated by the automatic garbage collection.
+        It logs these events for debug purposes in the event that multiple controller
+        instances are used simultaneously.
+        '''
+        logger.debug('Terminating application_controller instance.')

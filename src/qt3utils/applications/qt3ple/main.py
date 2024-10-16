@@ -3,6 +3,7 @@ import importlib
 import importlib.resources
 import logging
 import pickle
+import datetime
 from threading import Thread
 
 import matplotlib
@@ -46,13 +47,13 @@ STANDARD_CONTROLLERS = {NIDAQ_DEVICE_NAMES[0] : 'nidaq_rate_counter.yaml',
 
 SCAN_OPTIONS = ["Discrete", "Batches"]
 
-class ScanImage:
+class DataViewport:
     '''
     This class handles the GUI image of the PLE scan
 
-    Currently it appears to be more or less hard coded for the standard image plot
-    in a PLE scan. However, in the long term it should probably be generalized to 
-    handle other image types or as a standalone GUI element.
+    Currently it is hard coded for the standard image plot in a PLE scan.
+
+    TODO: Handle internal logic for writing image vs. integrated data to the screen
     '''
 
     def __init__(self, mplcolormap='gray') -> None:
@@ -145,12 +146,103 @@ class ScanImage:
     def onclick(self, event) -> None:
         pass
 
+class DataViewportControlPanel():
+    '''
+    GUI elements to control or modify the viewport and save scans.
+    '''
+    def __init__(self, root, scan_settings: dict) -> None:
 
-class SidePanel():
+        base_frame = tk.Frame(root)
+        base_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=16, pady=16)
+
+        # Define command frame for active buttons/control settings
+        command_frame = tk.Frame(base_frame)
+        command_frame.pack(side=tk.TOP, padx=20, pady=10)
+        row = 0
+        tk.Label(command_frame, text="PLE scan control", font='Helvetica 14').grid(row=row, column=0, pady=[0,10], columnspan=2)
+        row += 1
+        self.save_scan_button = tk.Button(command_frame, text="Save Scan", width=12)
+        self.save_scan_button.grid(row=row, column=0, columnspan=2, padx=0)
+
+
+        # Define settings frame to view scan settings
+        settings_frame = tk.Frame(base_frame)
+        settings_frame.pack(side=tk.TOP, padx=20, pady=10)
+        row=0
+        tk.Label(settings_frame, text="Scan settings", font='Helvetica 14').grid(row=row, column=0, pady=[0,10], columnspan=2)
+        # Min voltage
+        row += 1
+        tk.Label(settings_frame, text="Min voltage (V)").grid(row=row, column=0)
+        self.voltage_start_entry = tk.Entry(settings_frame, width=10)
+        self.voltage_start_entry.insert(0, scan_settings['min'])
+        self.voltage_start_entry.config(state='readonly')
+        self.voltage_start_entry.grid(row=row, column=1)
+        # Max voltage
+        row += 1
+        tk.Label(settings_frame, text="Max voltage (V)").grid(row=row, column=0)
+        self.voltage_end_entry = tk.Entry(settings_frame, width=10)
+        self.voltage_end_entry.insert(0, scan_settings['max'])
+        self.voltage_end_entry.config(state='readonly')
+        self.voltage_end_entry.grid(row=row, column=1)
+        # Number of pixels on upsweep
+        row += 1
+        tk.Label(settings_frame, text="# of pixels up").grid(row=row, column=0)
+        self.num_pixels_up_entry = tk.Entry(settings_frame, width=10)
+        self.num_pixels_up_entry.insert(0, scan_settings['n_pixels_up'])
+        self.num_pixels_up_entry.config(state='readonly')
+        self.num_pixels_up_entry.grid(row=row, column=1)
+        # Number of pixels on downsweep
+        row += 1
+        tk.Label(settings_frame, text="# of pixels down").grid(row=row, column=0)
+        self.num_pixels_down_entry = tk.Entry(settings_frame, width=10)
+        self.num_pixels_down_entry.insert(0, scan_settings['n_pixels_down'])
+        self.num_pixels_down_entry.config(state='readonly')
+        self.num_pixels_down_entry.grid(row=row, column=1)
+        # Number of scans
+        row += 1
+        tk.Label(settings_frame, text="# of scans").grid(row=row, column=0)
+        self.scan_num_entry = tk.Entry(settings_frame, width=10)
+        self.scan_num_entry.insert(0, scan_settings['n_scans'])
+        self.scan_num_entry.config(state='readonly')
+        self.scan_num_entry.grid(row=row, column=1, padx=10)
+        # Time for the upsweep min -> max
+        row += 1
+        tk.Label(settings_frame, text="Upsweep time (s)").grid(row=row, column=0)
+        self.upsweep_time_entry = tk.Entry(settings_frame, width=10)
+        self.upsweep_time_entry.insert(0, scan_settings['time_up'])
+        self.upsweep_time_entry.config(state='readonly')
+        self.upsweep_time_entry.grid(row=row, column=1)
+        # Time for the downsweep max -> min
+        row += 1
+        tk.Label(settings_frame, text="Downsweep time (s)").grid(row=row, column=0)
+        self.downsweep_time_entry = tk.Entry(settings_frame, width=10)
+        self.downsweep_time_entry.insert(0, scan_settings['time_down'])
+        self.downsweep_time_entry.config(state='readonly')
+        self.downsweep_time_entry.grid(row=row, column=1, padx=10)
+        # Adding advanced settings
+        row += 1
+        tk.Label(settings_frame, text="Advanced settings:", font='Helvetica 10').grid(row=row, column=0, pady=[8,0], columnspan=3)
+        # Number of subpixels to sample (each pixel has this number of samples)
+        # Note that excessively large values will slow the scan speed down due to
+        # the voltage movement overhead.
+        row += 1
+        tk.Label(settings_frame, text="# of sub-pixels").grid(row=row, column=0)
+        self.subpixel_entry = tk.Entry(settings_frame, width=10)
+        self.subpixel_entry.insert(0, scan_settings['n_subpixels'])
+        self.subpixel_entry.config(state='readonly')
+        self.subpixel_entry.grid(row=row, column=1)
+        # Button to enable repump at start of scan?
+        row += 1
+        tk.Label(settings_frame, text="Reump time (ms)").grid(row=row, column=0)
+        self.repump_entry = tk.Entry(settings_frame, width=10)
+        self.repump_entry.insert(0, scan_settings['time_repump'])
+        self.repump_entry.config(state='readonly')
+        self.repump_entry.grid(row=row, column=1)
+
+
+class ControlPanel():
     '''
     This class handles the GUI for scan parameter configuration.
-
-    Future plan is to simplify it further and separte it from the image panel
     '''
 
     def __init__(self, root, scan_range) -> None:
@@ -158,21 +250,21 @@ class SidePanel():
         # Define frame for the side panel
         # This encompasses the entire side pannel
         base_frame = tk.Frame(root.root)
-        base_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        base_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=16, pady=16)
 
         # Define command frame for start/stop/save buttons
         command_frame = tk.Frame(base_frame)
         command_frame.pack(side=tk.TOP, padx=20, pady=10)
         # Add buttons and text
         row = 0
-        tk.Label(command_frame, text="Scan control", font='Helvetica 14').grid(row=row, column=0, pady=[0,10], columnspan=3)
+        tk.Label(command_frame, text="PLE scan control", font='Helvetica 14').grid(row=row, column=0, pady=[0,10], columnspan=2)
         row += 1
         self.start_button = tk.Button(command_frame, text="Start Scan", width=12)
         self.start_button.grid(row=row, column=0, columnspan=1, padx=3)
         self.stop_button = tk.Button(command_frame, text="Stop Scan", width=12)
         self.stop_button.grid(row=row, column=1, columnspan=1, padx=3)
-        self.save_scan_button = tk.Button(command_frame, text="Save Scan", width=12)
-        self.save_scan_button.grid(row=row, column=2, columnspan=1, padx=3)
+        #self.save_scan_button = tk.Button(command_frame, text="Save Scan", width=12)
+        #self.save_scan_button.grid(row=row, column=2, columnspan=1, padx=3)
 
         # Define settings frame to set all scan settings
         settings_frame = tk.Frame(base_frame)
@@ -219,9 +311,9 @@ class SidePanel():
         self.downsweep_time_entry = tk.Entry(settings_frame, width=10)
         self.downsweep_time_entry.insert(10, 1)
         self.downsweep_time_entry.grid(row=row, column=1, padx=10)
-        # Adding advanced settings --- probably want it to be a pop-out menu? Maybe not if the image is separated
+        # Adding advanced settings
         row += 1
-        tk.Label(settings_frame, text="Advanced settings:", font='Helvetica 10').grid(row=row, column=0, pady=[5,0], columnspan=3)
+        tk.Label(settings_frame, text="Advanced settings:", font='Helvetica 10').grid(row=row, column=0, pady=[8,0], columnspan=3)
         # Number of subpixels to sample (each pixel has this number of samples)
         # Note that excessively large values will slow the scan speed down due to
         # the voltage movement overhead.
@@ -270,6 +362,90 @@ class SidePanel():
         self.hardware_config_from_yaml_button.grid(row=row, column=0, columnspan=1)
 
 
+class ScanPopoutApplicationView():
+    '''
+    Scan popout application GUI view, loads DataViewport and SidePanel (new)
+    '''
+    def __init__(self, main_frame, scan_settings: dict) -> None:
+        frame = tk.Frame(main_frame)
+        frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.data_viewport = DataViewport(args.cmap)
+        self.control_panel = DataViewportControlPanel(main_frame, scan_settings=scan_settings)
+
+        self.canvas = FigureCanvasTkAgg(self.data_viewport.fig, master=frame)
+        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        toolbar = NavigationToolbar2Tk(self.canvas, frame)
+        toolbar.update()
+        self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        self.canvas.draw()
+
+class ScanPopoutApplication():
+    '''
+    Scan popout application backend. Launches the GUI, houses the 
+    application_controller, handles events for controlling the view port and
+    saving data for a set of scans.
+    '''
+    def __init__(self, parent_application, application_controller, id: str = '') -> None:
+        # Store the application controller and number identifier
+        self.parent_application = parent_application
+        self.application_controller = application_controller
+        self.id = id
+
+        # First load meta/config data from the application controller
+        self.min = application_controller.min
+        self.max = application_controller.max
+        self.n_pixels_up = application_controller.n_pixels_up
+        self.n_pixels_down = application_controller.n_pixels_down
+        self.n_subpixels = application_controller.n_subpixels
+        self.time_up = application_controller.time_up
+        self.time_down = application_controller.time_down
+        self.n_scans = application_controller.n_scans
+        self.time_repump = application_controller.time_repump
+        self.pixel_step_size_up = application_controller.pixel_step_size_up
+        self.pixel_step_size_down = application_controller.pixel_step_size_down
+        self.sample_step_size_up = application_controller.sample_step_size_up
+        self.sample_step_size_down = application_controller.sample_step_size_down
+        self.pixel_voltages_up = application_controller.pixel_voltages_up
+        self.pixel_voltages_down = application_controller.pixel_voltages_down
+        self.sample_voltages_up = application_controller.sample_voltages_up
+        self.sample_voltages_down = application_controller.sample_voltages_down
+        self.pixel_time_up = application_controller.pixel_time_up
+        self.pixel_time_down = application_controller.pixel_time_down
+        self.sample_time_up = application_controller.sample_time_up
+        self.sample_time_down = application_controller.sample_time_down
+
+        # Then initialize the GUI
+        self.root = tk.Toplevel()
+        self.root.title(f'Scan {id} ({datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})')
+        self.view = ScanPopoutApplicationView(main_frame=self.root, scan_settings=self.__dict__)
+
+        # Bind the buttons to callbacks
+
+        # Set the behavior on clsing the window, launch main loop for window
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def on_closing(self) -> None:
+        '''
+        This function handles shutdown when window is closed.
+
+        This should warn the user that the current scan window was closed and
+        that one should check that the scan controller is not incorrectly in the
+        running state.
+        It then destroys the window.
+        
+        FYI: You shouldn't run self.root.quit() even on child processes because
+        this actually kills the mainloop() instantiated in startup and closes the
+        whole application outright.
+        '''
+        if self.application_controller.still_scanning():
+            logger.warning('Scan window closed while active. Verify scanning has stopped.')
+            self.parent_application.stop_scan()
+        self.root.destroy()
+
+
 
 class MainApplicationView():
     '''
@@ -279,17 +455,8 @@ class MainApplicationView():
         frame = tk.Frame(main_frame.root)
         frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.scan_view = ScanImage(args.cmap)
-        self.sidepanel = SidePanel(main_frame, scan_range)
+        self.control_panel = ControlPanel(main_frame, scan_range)
 
-        self.canvas = FigureCanvasTkAgg(self.scan_view.fig, master=frame)
-        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
-        toolbar = NavigationToolbar2Tk(self.canvas, frame)
-        toolbar.update()
-        self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
-        self.canvas.draw()
 
 
 class MainTkApplication():
@@ -310,6 +477,12 @@ class MainTkApplication():
         self.application_controller_constructor = None
         self.meta_configs = None
         self.app_meta_data = None
+        self.scan_thread = None
+
+        # List to keep track of child scan windows
+        self.scan_windows = []
+        self.current_scan = None
+        self.number_scans_on_session = 0 # The number of scans performed
 
         # Load the YAML file based off of `controller_name`
         self.load_controller_from_name(application_controller_name=controller_name)
@@ -323,19 +496,19 @@ class MainTkApplication():
         self.view.controller_option = controller_name
 
         # Bind the GUI buttons to callback functions
-        self.view.sidepanel.start_button.bind("<Button>", self.start_scan)
-        self.view.sidepanel.save_scan_button.bind("<Button>", self.save_scan)
-        self.view.sidepanel.stop_button.bind("<Button>", self.stop_scan)
-        self.view.sidepanel.goto_button.bind("<Button>", self.go_to)
-        self.view.sidepanel.get_button.bind("<Button>", self.update_voltage_show)
-        self.view.sidepanel.hardware_config_from_yaml_button.bind("<Button>", lambda e: self.configure_from_yaml())
+        self.view.control_panel.start_button.bind("<Button>", self.start_scan)
+        #self.view.control_panel.save_scan_button.bind("<Button>", self.save_scan)
+        self.view.control_panel.stop_button.bind("<Button>", self.stop_scan)
+        self.view.control_panel.goto_button.bind("<Button>", self.go_to)
+        self.view.control_panel.get_button.bind("<Button>", self.update_voltage_show)
+        self.view.control_panel.hardware_config_from_yaml_button.bind("<Button>", lambda e: self.configure_from_yaml())
 
         # Set protocol for shutdown when the root tkinter widget is closed
-        self.root.protocol("WM_DELETE_WINDOWwait_visibility()", self.on_closing)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def go_to(self, event=None) -> None:
         '''
-        Callback function for voltage setter `self.view.sidepanel.goto_button`
+        Callback function for voltage setter `self.view.control_panel.goto_button`
 
         This function is a wrapper for the `application_controller.go_to()` method
         which is itself a wrapper for the `wavelength_controller.got_to()` method.
@@ -346,7 +519,7 @@ class MainTkApplication():
         to change the voltage on the hardware.)
         '''
         self.disable_buttons()
-        self.wavelength_controller_model.go_to(float(self.view.sidepanel.voltage_entry.get()))
+        self.wavelength_controller_model.go_to(float(self.view.control_panel.voltage_entry.get()))
         self.enable_buttons()
 
     def update_voltage_show(self, event=None) -> None:
@@ -359,7 +532,7 @@ class MainTkApplication():
         # Get the last write value from the wavelength controller
         read = self.wavelength_controller_model.last_write_value
         # Update the GUI
-        voltage_getter_entry = self.view.sidepanel.voltage_show
+        voltage_getter_entry = self.view.control_panel.voltage_show
         # Need to set the tk.Entry into normal, update, then reset to readonly
         voltage_getter_entry.config(state='normal')     
         voltage_getter_entry.delete(0,'end')
@@ -376,27 +549,26 @@ class MainTkApplication():
         It then launches a Thread which runs the scanning function to avoid 
         locking up the GUI during the scan.
         '''
-        self.disable_buttons()
 
         # Get the scan parameters from the GUI
-        min_voltage = float(self.view.sidepanel.voltage_start_entry.get())
-        max_voltage = float(self.view.sidepanel.voltage_end_entry.get())
-        n_pixels_up = int(self.view.sidepanel.num_pixels_up_entry.get())
-        n_pixels_down = int(self.view.sidepanel.num_pixels_down_entry.get())
-        n_scans = int(self.view.sidepanel.scan_num_entry.get())
-        time_up = float(self.view.sidepanel.upsweep_time_entry.get())
-        time_down = float(self.view.sidepanel.downsweep_time_entry.get())
-        n_subpixels = int(self.view.sidepanel.subpixel_entry.get())
-        time_repump = float(self.view.sidepanel.repump_entry.get())
+        min_voltage = float(self.view.control_panel.voltage_start_entry.get())
+        max_voltage = float(self.view.control_panel.voltage_end_entry.get())
+        n_pixels_up = int(self.view.control_panel.num_pixels_up_entry.get())
+        n_pixels_down = int(self.view.control_panel.num_pixels_down_entry.get())
+        n_scans = int(self.view.control_panel.scan_num_entry.get())
+        time_up = float(self.view.control_panel.upsweep_time_entry.get())
+        time_down = float(self.view.control_panel.downsweep_time_entry.get())
+        n_subpixels = int(self.view.control_panel.subpixel_entry.get())
+        time_repump = float(self.view.control_panel.repump_entry.get())
 
-        # Create the application controller
-        self.application_controller = self.application_controller_constructor(
+        # Create an application controller
+        application_controller = self.application_controller_constructor(
                     readers = self.data_acquisition_models, 
                     wavelength_controller = self.wavelength_controller_model,
                     auxiliary_controllers = self.auxiliary_control_models)
 
         # Configure the scanner
-        self.application_controller.configure_scan(
+        application_controller.configure_scan(
                     min = min_voltage, 
                     max = max_voltage, 
                     n_pixels_up = n_pixels_up, 
@@ -406,6 +578,17 @@ class MainTkApplication():
                     time_down = time_down,
                     n_scans = n_scans,
                     time_repump = time_repump)
+        
+        # Launch new child scan window
+        self.number_scans_on_session += 1
+        self.current_scan = ScanPopoutApplication(parent_application=self,
+                                                  application_controller=application_controller, 
+                                                  id=str(self.number_scans_on_session).zfill(3))
+        self.scan_windows.append( self.current_scan )
+        logger.info(f'Creating new scan window number {self.number_scans_on_session}')
+
+        # Disable the buttons
+        self.disable_buttons()
 
         # Launch the thread
         self.app_meta_data = args
@@ -416,7 +599,7 @@ class MainTkApplication():
         '''
         Stops the scan
         '''
-        self.application_controller.stop()
+        self.current_scan.application_controller.stop()
         self.enable_buttons()
 
     def scan_thread_function(self) -> None:
@@ -427,15 +610,15 @@ class MainTkApplication():
         '''
         
         try:
-            self.application_controller.start()  # starts the DAQ
+            self.current_scan.application_controller.start()  # starts the DAQ
 
-            while self.application_controller.still_scanning():
-                self.application_controller.scan_wavelengths()
-                self.view.scan_view.update_image_and_plot(self.application_controller)
-                self.view.canvas.draw()
+            while self.current_scan.application_controller.still_scanning():
+                self.current_scan.application_controller.scan_wavelengths()
+                self.current_scan.view.data_viewport.update_image_and_plot(self.current_scan.application_controller)
+                self.current_scan.view.canvas.draw()
 
             logger.info('Scan complete.')
-            self.application_controller.stop()
+            self.current_scan.application_controller.stop()
 
         except nidaqmx.errors.DaqError as e:
             logger.info(e)
@@ -445,6 +628,9 @@ class MainTkApplication():
         self.enable_buttons()
 
     def save_scan(self, event = None):
+        '''
+        Method is currently not implemented
+        '''
         myformats = [('Pickle', '*.pkl')]
         afile = tk.filedialog.asksaveasfilename(filetypes=myformats, defaultextension='.pkl')
         logger.info(afile)
@@ -478,11 +664,9 @@ class MainTkApplication():
         If `afile` is not provided (default) then this method opens a GUI
         for the user to select a YAML file.
         
-        The current version of this method attempts to configure the
-        controller classes and instantiate the application controller.
-        Future modifications will instead save the configuration to the 
-        current top-level application (MainTkApplication) and then 
-        instantiate classes as needed.
+        This method configures the wavelength controller and the readers
+        based off of the YAML file data, and then generates a class 
+        consctrutor for the main application controller.
         '''
         # Specify the allowed filetypes (.yaml)
         filetypes = (
@@ -599,14 +783,6 @@ class MainTkApplication():
             # Save to auxiliary_control_models
             self.auxiliary_control_models[aux_ctrl] = aux_ctrl_model
 
-        # For now just launch the application controller manually
-        '''
-        # Commenting out to instantiate later
-        
-        self.application_controller = plescanner.PleScanner(
-            readers = self.data_acquisition_models, 
-            wavelength_controller = self.controller_model,
-            auxiliary_controllers = self.auxiliary_control_models)'''
 
     def load_controller_from_name(self, application_controller_name: str) -> None:
         '''
@@ -619,21 +795,32 @@ class MainTkApplication():
         self.configure_from_yaml(str(yaml_path))
 
     def disable_buttons(self):
-        self.view.sidepanel.start_button['state'] = 'disabled'
-        self.view.sidepanel.goto_button['state'] = 'disabled'
-        self.view.sidepanel.save_scan_button.config(state=tk.DISABLED)
+        self.view.control_panel.start_button['state'] = 'disabled'
+        self.view.control_panel.goto_button['state'] = 'disabled'
+        try:
+            self.current_scan.view.control_panel.save_scan_button.config(state=tk.DISABLED)
+        except Exception as e:
+            logger.debug('Exception caught disabling buttons')
+            logger.debug(e)
+            pass
 
     def enable_buttons(self):
-        self.view.sidepanel.start_button['state'] = 'normal'
-        self.view.sidepanel.goto_button['state'] = 'normal'
-        self.view.sidepanel.save_scan_button.config(state=tk.NORMAL)
+        self.view.control_panel.start_button['state'] = 'normal'
+        self.view.control_panel.goto_button['state'] = 'normal'
+        try:
+            self.current_scan.view.control_panel.save_scan_button.config(state=tk.NORMAL)
+        except Exception as e:
+            logger.debug('Exception caught enabling buttons')
+            logger.debug(e)
+            pass
+
 
     def run(self) -> None:
         '''
         This function launches the application itself.
         '''
         # Set the title of the app window
-        self.root.title("QT3PLE: Run PLE scan")
+        self.root.title("QT3PLE")
         # Display the window (not in task bar)
         self.root.deiconify()
         # Launch the main loop
@@ -644,14 +831,21 @@ class MainTkApplication():
         '''
         This function handles closing the application.
         '''
-        try:
-            self.stop_scan()
-            self.root.quit()
-            self.root.destroy()
-        except Exception as e:
-            logger.debug(e)
-            pass
+        if (self.scan_thread is not None) and (self.scan_thread.is_alive()):
+            if tk.messagebox.askokcancel(
+                    'Warning', 
+                    'Scan is currently running and may not close properly.'
+                    +'\nAre you sure you want to force quit?'):
+                logger.warning('Forcing application closure.')
 
+                # Close the application out
+                self.root.destroy()
+                self.root.quit()
+        else:
+            logger.info('Exiting application normally.')
+            self.root.destroy()
+            self.root.quit()
+        
 
 
 def main() -> None:
