@@ -304,9 +304,10 @@ class MainTkApplication():
         '''
 
         # Define class attributes to store data aquisition and controllers
-        self.controller_model = None
+        self.wavelength_controller_model = None
         self.data_acquisition_models = {}
         self.auxiliary_control_models = {}
+        self.application_controller_constructor = None
         self.meta_configs = None
         self.app_meta_data = None
 
@@ -317,8 +318,8 @@ class MainTkApplication():
         self.root = tk.Tk()
         # Create the main application GUI and specify the controller name
         self.view = MainApplicationView(self, 
-                                        scan_range=[self.application_controller.wavelength_controller.minimum_allowed_position, 
-                                                    self.application_controller.wavelength_controller.maximum_allowed_position])
+                                        scan_range=[self.wavelength_controller_model.minimum_allowed_position, 
+                                                    self.wavelength_controller_model.maximum_allowed_position])
         self.view.controller_option = controller_name
 
         # Bind the GUI buttons to callback functions
@@ -345,10 +346,7 @@ class MainTkApplication():
         to change the voltage on the hardware.)
         '''
         self.disable_buttons()
-        controller_speed = self.application_controller.wavelength_controller.speed
-        self.application_controller.wavelength_controller.speed = "fast"
-        self.application_controller.go_to(float(self.view.sidepanel.voltage_entry.get()))
-        self.application_controller.wavelength_controller.speed = controller_speed
+        self.wavelength_controller_model.go_to(float(self.view.sidepanel.voltage_entry.get()))
         self.enable_buttons()
 
     def update_voltage_show(self, event=None) -> None:
@@ -359,7 +357,7 @@ class MainTkApplication():
         then updates the result on the GUI.
         '''
         # Get the last write value from the wavelength controller
-        read = self.application_controller.wavelength_controller.last_write_value
+        read = self.wavelength_controller_model.last_write_value
         # Update the GUI
         voltage_getter_entry = self.view.sidepanel.voltage_show
         # Need to set the tk.Entry into normal, update, then reset to readonly
@@ -390,6 +388,12 @@ class MainTkApplication():
         time_down = float(self.view.sidepanel.downsweep_time_entry.get())
         n_subpixels = int(self.view.sidepanel.subpixel_entry.get())
         time_repump = float(self.view.sidepanel.repump_entry.get())
+
+        # Create the application controller
+        self.application_controller = self.application_controller_constructor(
+                    readers = self.data_acquisition_models, 
+                    wavelength_controller = self.wavelength_controller_model,
+                    auxiliary_controllers = self.auxiliary_control_models)
 
         # Configure the scanner
         self.application_controller.configure_scan(
@@ -512,6 +516,13 @@ class MainTkApplication():
         # We will use this to instantiate the application controller later on
         appl_ctrl_import_path = config[APPLICATION_NAME]['ApplicationController']['import_path']
         appl_ctrl_class_name = config[APPLICATION_NAME]['ApplicationController']['class_name']
+        # Now we create a constructor for the aplication controller class
+        # Import the application controller module
+        module = importlib.import_module(appl_ctrl_import_path)
+        logger.debug(f"Importing {appl_ctrl_import_path}")
+        # Get the class constructor and write it to main
+        self.application_controller_constructor = getattr(module, appl_ctrl_class_name)
+        
 
         # The import paths and class names for the controllers and readers
         # are stored in the same YAML file at the same level as ['ApplicationController']
@@ -551,9 +562,9 @@ class MainTkApplication():
         # Get the class generator
         controller_class = getattr(module, controller_model_yaml_dict['class_name'])
         # Instantiate the class 
-        self.controller_model = controller_class(logger.level)
+        self.wavelength_controller_model = controller_class(logger.level)
         # Configure using the YAML config
-        self.controller_model.configure(controller_model_yaml_dict['configure'])
+        self.wavelength_controller_model.configure(controller_model_yaml_dict['configure'])
 
         # Repeat for each of the readers, store in MainTkApplication.data_acquisition_models
         for reader in reader_names:
@@ -589,10 +600,13 @@ class MainTkApplication():
             self.auxiliary_control_models[aux_ctrl] = aux_ctrl_model
 
         # For now just launch the application controller manually
+        '''
+        # Commenting out to instantiate later
+        
         self.application_controller = plescanner.PleScanner(
             readers = self.data_acquisition_models, 
             wavelength_controller = self.controller_model,
-            auxiliary_controllers = self.auxiliary_control_models)
+            auxiliary_controllers = self.auxiliary_control_models)'''
 
     def load_controller_from_name(self, application_controller_name: str) -> None:
         '''
