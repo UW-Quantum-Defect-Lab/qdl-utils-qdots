@@ -200,7 +200,7 @@ class ArbitraryDAQVoltageController:
             debug_string.append(f'v: {v:.2f}')
         self.logger.debug(f'go to voltage {" ".join(debug_string)}')
         # Wait at new position if desired
-        if time > 0:
+        if self.settling_time_in_seconds > 0:
             time.sleep(self.settling_time_in_seconds)
         self.logger.debug(f'last write: {self.last_write_value}')
 

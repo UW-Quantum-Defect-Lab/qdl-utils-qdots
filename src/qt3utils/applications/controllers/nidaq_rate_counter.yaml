@@ -3,15 +3,11 @@ QT3PLE:
     import_path : qt3utils.datagenerators.plescanner
     class_name : PleScanner
     configure :
-      controllers:
-        daq_writers:
-          daq_writer : VoltageController
+      controller: VoltageController
       readers :
-        daq_readers:
-          daq_reader : DAQCounter
-        wm_readers:
-      extras :
-        daq_writers : RepumpController
+        daq_reader : DAQCounter
+      auxiliary_controllers :
+        daq_writer : RepumpController
 
   DAQCounter:
     import_path : qt3utils.applications.controllers.nidaqedgecounter
@@ -37,14 +33,14 @@ QT3PLE:
       scale_nm_per_volt: 1  # microns
 
   RepumpController:
-    import_path : qt3utils.nidaq.customcontrollers
-    class_name  : ArbitraryDAQVoltageController
+    import_path   : qt3utils.nidaq.customcontrollers
+    class_name    : ArbitraryDAQVoltageController
     configure :
       daq_name : Dev2  # NI DAQ Device Name
       write_channels : ao0  # NI DAQ analog output channels to use for writing position
       read_channels :   # NI DAQ analog input channels to use for reading position
-      min_position: 0  # conversion factor from volts to microns, can also supply a list [8,8,8] or [6,4.2,5]
-      max_position: 51  # the voltage value that defines the position 0,0,0, can also supply a list [0,0,0] or [5,5,5]
+      min_voltage: 0  # conversion factor from volts to microns, can also supply a list [8,8,8] or [6,4.2,5]
+      max_voltage: 1  # the voltage value that defines the position 0,0,0, can also supply a list [0,0,0] or [5,5,5]
 
 
 # notes

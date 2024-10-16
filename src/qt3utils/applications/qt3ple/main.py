@@ -21,7 +21,7 @@ matplotlib.use('Agg')
 parser = argparse.ArgumentParser(description='NI DAQ (PCIx 6363) / PLE Scanner',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-v', '--verbose', type=int, default=2, help='0 = quiet, 1 = info, 2 = debug.')
-parser.add_argument('-cmap', metavar='<MPL color>', default='gray',
+parser.add_argument('-cmap', metavar='<MPL color>', default='Blues',
                     help='Set the MatplotLib colormap scale')
 args = parser.parse_args()
 
@@ -117,7 +117,7 @@ class ScanImage:
         ax.set_ylabel('Voltage (V)', fontsize=14)
         cbar.ax.set_ylabel('Counts/sec', fontsize=14, rotation=270, labelpad=15)
         # Set the grid
-        ax.grid(alpha=0.3, axis='y', linewidth=1, color='w', dashes=(5,5))
+        ax.grid(alpha=0.3, axis='y', linewidth=1, color='k')#, dashes=(5,5))
 
     def calculate_ytick_labels(self, y, y_min, y_max, max_tick):
         '''
@@ -304,8 +304,9 @@ class MainTkApplication():
         '''
 
         # Define class attributes to store data aquisition and controllers
-        self.data_acquisition_models = {}
         self.controller_model = None
+        self.data_acquisition_models = {}
+        self.auxiliary_control_models = {}
         self.meta_configs = None
         self.app_meta_data = None
 
@@ -505,39 +506,93 @@ class MainTkApplication():
         # At this point the `config` variable is a dictionary of 
         # nested dictionaries corresponding to each indent level in the YAML.
         # First we get the top level application name, e.g. "QT3PLE"
-        CONFIG_FILE_APPLICATION_NAME = list(config.keys())[0]
+        APPLICATION_NAME = list(config.keys())[0]
 
-        # Now retrieve the application controller configuration
-        self.app_controller_config = config[CONFIG_FILE_APPLICATION_NAME]["ApplicationController"]
+        # Get the import path and class name for the application controller
+        # We will use this to instantiate the application controller later on
+        appl_ctrl_import_path = config[APPLICATION_NAME]['ApplicationController']['import_path']
+        appl_ctrl_class_name = config[APPLICATION_NAME]['ApplicationController']['class_name']
 
-        self.app_config = self.app_controller_config["configure"]
-        
-        daq_readers = self.app_config["readers"]["daq_readers"]
-        self.meta_configs = []
-        self.data_acquisition_models = {}
-        if daq_readers is not None:
-            for daq_reader in daq_readers:
-                daq_reader_name = daq_readers[daq_reader]
-                daq_reader_config = config[CONFIG_FILE_APPLICATION_NAME][daq_reader_name]
-                self.meta_configs.append(daq_reader_config)
-                module = importlib.import_module(daq_reader_config['import_path'])
-                logger.debug(f"loading {daq_reader_config['import_path']}")
-                cls = getattr(module, daq_reader_config['class_name'])
-                self.data_acquisition_models[daq_reader_name] = cls(logger.level)
-                self.data_acquisition_models[daq_reader_name].configure(daq_reader_config['configure'])
+        # The import paths and class names for the controllers and readers
+        # are stored in the same YAML file at the same level as ['ApplicationController']
+        # However, at this point we do not know how they are used by the
+        # application controller. This information is referenced in the 
+        # ['ApplicationController']['configure'] level.
 
-        daq_controller_name = config[CONFIG_FILE_APPLICATION_NAME]['ApplicationController']['configure']['controllers']['daq_writers']['daq_writer']
-        daq_controller_config = config[CONFIG_FILE_APPLICATION_NAME][daq_controller_name]
-        self.meta_configs.append(daq_controller_config)
-        if daq_controller_config is not None:
-            module = importlib.import_module(daq_controller_config['import_path'])
-            logger.debug(f"loading {daq_controller_config['import_path']}")
-            cls = getattr(module, daq_controller_config['class_name'])
-            self.controller_model = cls(logger.level)
-            self.controller_model.configure(daq_controller_config['configure'])
-        else:
-           raise Exception("Yaml configuration file must have a controller for PLE scan.")
-        self.application_controller = plescanner.PleScanner(self.data_acquisition_models, self.controller_model)
+        # There are three classes to configure, (1) controllers, (2) readers,
+        # and (3) auxiliary controllers.
+        # There can only be one controller for this application, we retrieve it by
+        controller_name = config[APPLICATION_NAME]['ApplicationController']['configure']['controller']
+        # There can be multiple readers. We can retrieve them by getting the
+        # values of the readers dict (in no particular order)
+        # In the future this step, and the YAML format should be modified to
+        # handle the case of a single principal reader (which dictates the timing)
+        # and multiple auxiliary readers which depend off of it.
+        # This can be implemented by utilizing the keys of the ['configure']['readers']
+        # dictionary, or by separating out ['configure']['readers'] into a 
+        # singular ['configure']['principal_reader'] and ['configure']['aux_readers']
+        # For now we just take all readers simultaneously in no particular order.
+        reader_names = config[APPLICATION_NAME]['ApplicationController']['configure']['readers'].values()
+        # Finally we can get the auxiliary controllers in the same way
+        # We don't really care about the order here since we will use their names
+        # as a way to reference them within the code itself.
+        aux_ctrl_names = config[APPLICATION_NAME]['ApplicationController']['configure']['auxiliary_controllers'].values()
+
+        # Now that we have their names we can retrieve their import paths
+        # and class names from the YAML, along with their configurations.
+        # We then can instantiate the controllers and readers and store them
+        # within the application instance.
+        # First get the dictionary containing the controller configuration
+        controller_model_yaml_dict = config[APPLICATION_NAME][controller_name]
+
+        # Import the controller model module
+        module = importlib.import_module(controller_model_yaml_dict['import_path'])
+        logger.debug(f"Importing {controller_model_yaml_dict['import_path']}")
+        # Get the class generator
+        controller_class = getattr(module, controller_model_yaml_dict['class_name'])
+        # Instantiate the class 
+        self.controller_model = controller_class(logger.level)
+        # Configure using the YAML config
+        self.controller_model.configure(controller_model_yaml_dict['configure'])
+
+        # Repeat for each of the readers, store in MainTkApplication.data_acquisition_models
+        for reader in reader_names:
+            # First get the dictionary containing the controller configuration
+            reader_model_yaml_dict = config[APPLICATION_NAME][reader]
+            # Import the controller model module
+            module = importlib.import_module(reader_model_yaml_dict['import_path'])
+            logger.debug(f"Importing {reader_model_yaml_dict['import_path']}")
+            # Get the class generator
+            reader_class = getattr(module, reader_model_yaml_dict['class_name'])
+            # Instantiate the class 
+            reader_model = reader_class(logger.level)
+            # Configure using the YAML config
+            reader_model.configure(reader_model_yaml_dict['configure'])
+            # Save to data_acquisition_models
+            self.data_acquisition_models[reader] = reader_model
+
+        # Repeat for each of the auxiliary controllers, store in MainTkApplication.auxiliary_control_models
+        # Repeat for each of the readers
+        for aux_ctrl in aux_ctrl_names:
+            # First get the dictionary containing the controller configuration
+            aux_ctrl_model_yaml_dict = config[APPLICATION_NAME][aux_ctrl]
+            # Import the controller model module
+            module = importlib.import_module(aux_ctrl_model_yaml_dict['import_path'])
+            logger.debug(f"Importing {aux_ctrl_model_yaml_dict['import_path']}")
+            # Get the class generator
+            aux_ctrl_class = getattr(module, aux_ctrl_model_yaml_dict['class_name'])
+            # Instantiate the class 
+            aux_ctrl_model = aux_ctrl_class(logger.level)
+            # Configure using the YAML config
+            aux_ctrl_model.configure(aux_ctrl_model_yaml_dict['configure'])
+            # Save to auxiliary_control_models
+            self.auxiliary_control_models[aux_ctrl] = aux_ctrl_model
+
+        # For now just launch the application controller manually
+        self.application_controller = plescanner.PleScanner(
+            readers = self.data_acquisition_models, 
+            wavelength_controller = self.controller_model,
+            auxiliary_controllers = self.auxiliary_control_models)
 
     def load_controller_from_name(self, application_controller_name: str) -> None:
         '''

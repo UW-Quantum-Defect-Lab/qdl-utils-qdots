@@ -29,7 +29,7 @@ class PleScanner:
     def __init__(self, 
                  readers: dict, 
                  wavelength_controller: WavelengthControlBase,
-                 extra_controllers: dict = {}) -> None:
+                 auxiliary_controllers: dict = {}) -> None:
         '''
         Args:
             readers                 :   Dictionary of data generators, class can be arbitrary
@@ -39,7 +39,7 @@ class PleScanner:
                                         additional data collection.
             wavelength_controller   :   Wavelength controller class inheriting from
                                         qt3utils.nidaq.customcontrollers.WavelengthControlBase
-            extra_controllers       :   A dictionary of additional controllers of arbitrary
+            auxiliary_controllers   :   A dictionary of additional controllers of arbitrary
                                         class. Use this to pass additional controllers for
                                         intermidiate steps such as pulse sequencing.
                                         A basic form of unconditional repump is implemented here.
@@ -48,7 +48,7 @@ class PleScanner:
         # Store the readers and wavelength controller
         self.readers = readers
         self.wavelength_controller = wavelength_controller
-        self.extra_controllers = extra_controllers
+        self.auxiliary_controllers = auxiliary_controllers
         
         # Control variables for system state
         self.running = False
@@ -466,7 +466,7 @@ class PleScanner:
         Basic implementation of a repump pulse using the analog voltage output
         of nidaq to switch a laser through an AOM.
 
-        Current implementation expects an entry in the `self.extra_controllers`
+        Current implementation expects an entry in the `self.auxiliary_controllers`
         dictionary with key 'repump' that is of class 
         `qt3ple.nidaq.customcontrollers.ArbitraryDAQVoltageController`
 
@@ -475,15 +475,15 @@ class PleScanner:
         the code directly. Timing is controlled by the imprecise time module.
 
         Generic modifications to the PLE code should implement functions of this
-        type with reference to specific entries in the `extra_controllers` dict.
+        type with reference to specific entries in the `auxiliary_controllers` dict.
         '''
         # Get the repump controller
-        repump_controller = self.extra_controllers['repump']
+        repump_controller = self.auxiliary_controllers['RepumpController']
         # Log repump
         logger.info(f'Repump for {self.time_repump} ms')
         # Turn on the pump laser
-        repump_controller.go_to(v=repump_controller.max_voltage)
+        repump_controller.go_to(v=repump_controller.maximum_allowed_voltage)
         # Wait for repump time
-        time.sleep(self.time_repump)
+        time.sleep(self.time_repump * 0.001)
         # Turn off the pump laser
-        repump_controller.go_to(v=repump_controller.min_voltage)
+        repump_controller.go_to(v=repump_controller.minimum_allowed_voltage)
