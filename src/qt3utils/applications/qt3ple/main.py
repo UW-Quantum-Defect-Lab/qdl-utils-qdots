@@ -4,6 +4,7 @@ import importlib.resources
 import logging
 import pickle
 import datetime
+import h5py
 from threading import Thread
 
 import matplotlib
@@ -14,6 +15,7 @@ import numpy as np
 import tkinter as tk
 import yaml
 
+import qt3utils
 from qt3utils.datagenerators import plescanner
 from qt3utils.applications.controllers.nidaqedgecounter import QT3ScanNIDAQEdgeCounterController
 
@@ -263,8 +265,6 @@ class ControlPanel():
         self.start_button.grid(row=row, column=0, columnspan=1, padx=3)
         self.stop_button = tk.Button(command_frame, text="Stop Scan", width=12)
         self.stop_button.grid(row=row, column=1, columnspan=1, padx=3)
-        #self.save_scan_button = tk.Button(command_frame, text="Save Scan", width=12)
-        #self.save_scan_button.grid(row=row, column=2, columnspan=1, padx=3)
 
         # Define settings frame to set all scan settings
         settings_frame = tk.Frame(base_frame)
@@ -393,6 +393,8 @@ class ScanPopoutApplication():
         self.parent_application = parent_application
         self.application_controller = application_controller
         self.id = id
+        self.timestamp = datetime.datetime.now()
+        
 
         # First load meta/config data from the application controller
         self.min = application_controller.min
@@ -419,13 +421,156 @@ class ScanPopoutApplication():
 
         # Then initialize the GUI
         self.root = tk.Toplevel()
-        self.root.title(f'Scan {id} ({datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})')
+        self.root.title(f'Scan {id} ({self.timestamp.strftime("%Y-%m-%d %H:%M:%S")})')
         self.view = ScanPopoutApplicationView(main_frame=self.root, scan_settings=self.__dict__)
 
         # Bind the buttons to callbacks
+        self.view.control_panel.save_scan_button.bind("<Button>", self.save_data)
 
         # Set the behavior on clsing the window, launch main loop for window
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def save_data(self, event=None) -> None:
+        '''
+        Method to save the data, you can add more logic later for other filetypes.
+        The event input is to catch the tkinter event that is supplied but not used.
+        '''
+        allowed_formats = [('Image with dataset', '*.png'), ('Dataset', '*.hdf5')]
+
+        # Default filename
+        default_name = f'scan{self.id}_{self.timestamp.strftime("%Y%m%d")}'
+            
+        # Get the savefile name
+        afile = tk.filedialog.asksaveasfilename(filetypes=allowed_formats, 
+                                                initialfile=default_name+'.png',
+                                                initialdir = self.parent_application.last_save_directory)
+        # Handle if file was not chosen
+        if afile is None or afile == '':
+            logger.warning('File not saved!')
+            return # selection was canceled.
+
+        # Get the path
+        file_path = '/'.join(afile.split('/')[:-1])  + '/'
+        self.parent_application.last_save_directory = file_path # Save the last used file path
+        logger.info(f'Saving files to directory: {file_path}')
+        # Get the name with extension (will be overwritten)
+        file_name = afile.split('/')[-1]
+        # Get the filetype
+        file_type = file_name.split('.')[-1]
+        # Get the filename without extension
+        file_name = '.'.join(file_name.split('.')[:-1]) # Gets everything but the extension
+
+        # If the file type is .png, want to save image and hdf5
+        if file_type == 'png':
+            logger.info(f'Saving the PNG as {file_name}.png')
+            fig = self.view.data_viewport.fig
+            fig.savefig(file_path+file_name+'.png', dpi=300, bbox_inches=None, pad_inches=0)
+
+        # Save as hdf5
+        with h5py.File(file_path+file_name+'.hdf5', 'w') as df:
+            
+            logger.info(f'Saving the HDF5 as {file_name}.hdf5')
+            
+            # Save the file metadata
+            ds = df.create_dataset('file_metadata', 
+                                   data=['application', 'qdl_utils_version', 'scan_id', 'timestamp', 'original_name'])
+            ds.attrs['application'] = 'qdlutils.qt3ple'
+            ds.attrs['qdl_utils_version'] = qt3utils.__version__
+            ds.attrs['scan_id'] = self.id
+            ds.attrs['timestamp'] = self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            ds.attrs['original_name'] = file_name
+
+            # Save the scan settings
+            # If your implementation settings vary you should change the attrs
+            ds = df.create_dataset('scan_settings/min', data=self.min)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Minimum scan voltage'
+            ds = df.create_dataset('scan_settings/max', data=self.max)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Maximum scan voltage'
+            # Pixel settings
+            ds = df.create_dataset('scan_settings/n_pixels_up', data=self.n_pixels_up)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Number of pixels on upsweep'
+            ds = df.create_dataset('scan_settings/n_pixels_down', data=self.n_pixels_down)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Number of pixels on downsweep'
+            ds = df.create_dataset('scan_settings/n_subpixels', data=self.n_subpixels)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Number of subpixel samples per pixel'
+            ds = df.create_dataset('scan_settings/n_scans', data=self.n_scans)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Number of scans requested'
+            # Time settings
+            ds = df.create_dataset('scan_settings/time_up', data=self.time_up)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Total time for upsweep'
+            ds = df.create_dataset('scan_settings/time_down', data=self.time_down)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Total time for downsweep'
+            ds = df.create_dataset('scan_settings/time_repump', data=self.time_repump)
+            ds.attrs['units'] = 'Milliseconds'
+            ds.attrs['description'] = 'Time for repump at start of scan'
+            # Derived settings
+            ds = df.create_dataset('scan_settings/pixel_step_size_up', data=self.pixel_step_size_up)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Voltage step size between pixels on upsweep'
+            ds = df.create_dataset('scan_settings/pixel_step_size_down', data=self.pixel_step_size_down)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Voltage step size between pixels on downsweep'
+            ds = df.create_dataset('scan_settings/sample_step_size_up', data=self.sample_step_size_up)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Voltage step size between samples on upsweep'
+            ds = df.create_dataset('scan_settings/sample_step_size_down', data=self.sample_step_size_down)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Voltage step size between samples on downsweep'
+            ds = df.create_dataset('scan_settings/pixel_time_up', data=self.pixel_time_up)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Total time per pixel on upsweep'
+            ds = df.create_dataset('scan_settings/pixel_voltages_down', data=self.pixel_voltages_down)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Total time per pixel on downsweep'
+            ds = df.create_dataset('scan_settings/sample_time_up', data=self.sample_time_up)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Integration time per sample on upsweep'
+            ds = df.create_dataset('scan_settings/sample_time_down', data=self.sample_time_down)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Integration time per sample on downsweep'
+
+            # Create the primary datasets
+            ds = df.create_dataset('data/pixel_voltages_up', data=self.pixel_voltages_up)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Voltage value at start of each pixel on upsweep'
+            ds = df.create_dataset('data/pixel_voltages_down', data=self.pixel_voltages_down)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Voltage value at start of each pixel on downsweep'
+            ds = df.create_dataset('data/sample_voltages_up', data=self.sample_voltages_up)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Voltage value at sample points on upsweep'
+            ds = df.create_dataset('data/sample_voltages_down', data=self.sample_voltages_down)
+            ds.attrs['units'] = 'Volts'
+            ds.attrs['description'] = 'Voltage value at sample points on downsweep'
+
+            # Get the full image data
+            # Maybe can remove if we update image data at the popout window level?
+            for reader in self.application_controller.readers:
+                if isinstance(self.application_controller.readers[reader], QT3ScanNIDAQEdgeCounterController):
+                    img_data = np.array([output[reader] for output in self.application_controller.outputs])
+            # Write the image data to file
+            ds = df.create_dataset('data/scan_counts', data=img_data)
+            ds.attrs['units'] = 'Counts/second'
+            ds.attrs['description'] = ('2-d array of counts per second at each pixel of the completed scans.'
+                                      +' Each row consists of one upscan and downscan pair, appended in order.'
+                                      +' The scans are ordered from oldest to newest.')
+            ds = df.create_dataset('data/upscan_counts', data=[scan[:self.n_pixels_up] for scan in img_data])
+            ds.attrs['units'] = 'Counts/second'
+            ds.attrs['description'] = '2-d array of counts per second at each pixel of the upscans only.'
+            ds = df.create_dataset('data/downscan_counts', data=[scan[self.n_pixels_up:] for scan in img_data])
+            ds.attrs['units'] = 'Counts/second'
+            ds.attrs['description'] = '2-d array of counts per second at each pixel of the downscans only.'
+
+
+
 
     def on_closing(self) -> None:
         '''
@@ -483,6 +628,7 @@ class MainTkApplication():
         self.scan_windows = []
         self.current_scan = None
         self.number_scans_on_session = 0 # The number of scans performed
+        self.last_save_directory = 'C:/Users/Fu Lab NV PC/Documents' # Modify this for your system
 
         # Load the YAML file based off of `controller_name`
         self.load_controller_from_name(application_controller_name=controller_name)
@@ -549,6 +695,8 @@ class MainTkApplication():
         It then launches a Thread which runs the scanning function to avoid 
         locking up the GUI during the scan.
         '''
+        if self.current_scan is not None and self.current_scan.application_controller.running:
+            return # Catch accidential trigger during scan?
 
         # Get the scan parameters from the GUI
         min_voltage = float(self.view.control_panel.voltage_start_entry.get())
@@ -800,9 +948,10 @@ class MainTkApplication():
         try:
             self.current_scan.view.control_panel.save_scan_button.config(state=tk.DISABLED)
         except Exception as e:
-            logger.debug('Exception caught disabling buttons')
-            logger.debug(e)
-            pass
+            if self.current_scan is not None:
+                logger.debug('Exception caught disabling buttons')
+                logger.debug(e)
+                pass
 
     def enable_buttons(self):
         self.view.control_panel.start_button['state'] = 'normal'
@@ -810,9 +959,10 @@ class MainTkApplication():
         try:
             self.current_scan.view.control_panel.save_scan_button.config(state=tk.NORMAL)
         except Exception as e:
-            logger.debug('Exception caught enabling buttons')
-            logger.debug(e)
-            pass
+            if self.current_scan is not None:
+                logger.debug('Exception caught enabling buttons')
+                logger.debug(e)
+                pass
 
 
     def run(self) -> None:
