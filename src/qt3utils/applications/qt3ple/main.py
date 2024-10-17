@@ -473,9 +473,13 @@ class ScanPopoutApplication():
             
             # Save the file metadata
             ds = df.create_dataset('file_metadata', 
-                                   data=['application', 'qdl_utils_version', 'scan_id', 'timestamp', 'original_name'])
+                                   data=np.array(['application', 
+                                                  'qdlutils_version', 
+                                                  'scan_id', 
+                                                  'timestamp', 
+                                                  'original_name'], dtype='S'))
             ds.attrs['application'] = 'qdlutils.qt3ple'
-            ds.attrs['qdl_utils_version'] = qt3utils.__version__
+            ds.attrs['qdlutils_version'] = qt3utils.__version__
             ds.attrs['scan_id'] = self.id
             ds.attrs['timestamp'] = self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
             ds.attrs['original_name'] = file_name
@@ -527,7 +531,7 @@ class ScanPopoutApplication():
             ds = df.create_dataset('scan_settings/pixel_time_up', data=self.pixel_time_up)
             ds.attrs['units'] = 'Seconds'
             ds.attrs['description'] = 'Total time per pixel on upsweep'
-            ds = df.create_dataset('scan_settings/pixel_voltages_down', data=self.pixel_voltages_down)
+            ds = df.create_dataset('scan_settings/pixel_time_down', data=self.pixel_time_down)
             ds.attrs['units'] = 'Seconds'
             ds.attrs['description'] = 'Total time per pixel on downsweep'
             ds = df.create_dataset('scan_settings/sample_time_up', data=self.sample_time_up)
