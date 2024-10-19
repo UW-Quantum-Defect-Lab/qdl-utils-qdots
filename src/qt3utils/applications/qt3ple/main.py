@@ -109,8 +109,16 @@ class DataViewport:
                         origin='lower')
         cbar = self.fig.colorbar(artist, ax=ax)
 
-        # Set the tick labels
-        ax.set_xticks( np.arange(1,img_data.shape[0]+1,1) ) # Set the xticks on integer values
+        # Set the xtick labels
+        # We set up some logic to make it readable
+        n_scans = img_data.shape[0]
+        if n_scans < 11:
+            # Set the xticks on integer values for 1-10
+            ax.set_xticks( np.arange(1,n_scans+1,1) )
+        else:
+            # Set on every 5 if more than 10 scans long
+            ax.set_xticks( np.arange(5,n_scans+1,5) )
+        # Set the ytick labels
         y_ticks = ax.get_yticks()
         ax.set_yticks( y_ticks, self.calculate_ytick_labels(y_ticks, model.min, model.max, y_max) ) # Set the yticks to match scan
         # Reset the extent
@@ -347,10 +355,17 @@ class ControlPanel():
         row += 1
         self.get_button = tk.Button(control_frame, text="Get voltage (V)", width=12)
         self.get_button.grid(row=row, column=0)
-        self.voltage_show=tk.Entry(control_frame, width=10)
+        self.voltage_show = tk.Entry(control_frame, width=10)
         self.voltage_show.insert(10, 0)
         self.voltage_show.grid(row=row, column=1)
         self.voltage_show.config(state='readonly') # Disable the voltage show
+        # Getter for the voltage (based off of the latest set value)
+        row += 1
+        self.repump_laser_on = tk.IntVar()
+        self.repump_laser_toggle_label = tk.Label(control_frame, text='Toggle repump laser')
+        self.repump_laser_toggle_label.grid(row=row, column=0, pady=[5,0])
+        self.repump_laser_toggle = tk.Checkbutton ( control_frame, var=self.repump_laser_on)
+        self.repump_laser_toggle.grid(row=row, column=1, pady=[5,0])
 
         # Define config frame to set the config file
         config_frame = tk.Frame(base_frame)
@@ -647,11 +662,14 @@ class MainTkApplication():
 
         # Bind the GUI buttons to callback functions
         self.view.control_panel.start_button.bind("<Button>", self.start_scan)
-        #self.view.control_panel.save_scan_button.bind("<Button>", self.save_scan)
         self.view.control_panel.stop_button.bind("<Button>", self.stop_scan)
         self.view.control_panel.goto_button.bind("<Button>", self.go_to)
         self.view.control_panel.get_button.bind("<Button>", self.update_voltage_show)
         self.view.control_panel.hardware_config_from_yaml_button.bind("<Button>", lambda e: self.configure_from_yaml())
+        self.view.control_panel.repump_laser_toggle.config(command=self.toggle_repump_laser)
+
+        # Turn off the repump laser at startup
+        self.toggle_repump_laser(cmd=False)
 
         # Set protocol for shutdown when the root tkinter widget is closed
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -689,6 +707,33 @@ class MainTkApplication():
         voltage_getter_entry.insert(0,read)
         voltage_getter_entry.config(state='readonly')
 
+    def toggle_repump_laser(self, cmd:bool=None) -> None:
+        '''
+        Callback to toggle the repump laser.
+        Also functions as a directly callable function in the code 
+        by passing the boolean `on` variable.
+        '''
+        # Check if the application has a repump controller
+        if 'RepumpController' in self.auxiliary_control_models:
+
+            # If the GUI toggle is on and no direct command `cmd` given
+            # OR if the direct command is True then turn on the laser
+            if ((self.view.control_panel.repump_laser_on.get() == 1) and cmd is None) or (cmd is True):
+                logger.info('Turning repump laser on.')
+                self.disable_buttons()
+                self.auxiliary_control_models['RepumpController'].go_to(
+                    v=self.auxiliary_control_models['RepumpController'].maximum_allowed_voltage)
+                self.enable_buttons()
+            # Else if the GUI toggle is off and no direct command is given
+            # OR if the direct command is False then turn off the laser
+            elif ((self.view.control_panel.repump_laser_on.get() == 0) and cmd is None) or (cmd is False):
+                logger.info('Turning repump laser off.')
+                self.disable_buttons()
+                self.auxiliary_control_models['RepumpController'].go_to(
+                    v=self.auxiliary_control_models['RepumpController'].minimum_allowed_voltage)
+                self.enable_buttons()
+
+
     def start_scan(self, event=None) -> None:
         '''
         Callback to start scan button.
@@ -701,6 +746,9 @@ class MainTkApplication():
         '''
         if self.current_scan is not None and self.current_scan.application_controller.running:
             return # Catch accidential trigger during scan?
+        
+        # Turn off the repump laser
+        self.toggle_repump_laser(cmd=False)
 
         # Get the scan parameters from the GUI
         min_voltage = float(self.view.control_panel.voltage_start_entry.get())
@@ -993,12 +1041,15 @@ class MainTkApplication():
                 logger.warning('Forcing application closure.')
 
                 # Close the application out
+                self.toggle_repump_laser(cmd=True) # Turn the repump laser back on
                 self.root.destroy()
                 self.root.quit()
         else:
-            logger.info('Exiting application normally.')
+            self.toggle_repump_laser(cmd=True)
             self.root.destroy()
             self.root.quit()
+        
+        logger.info('Exited application.')
         
 
 
