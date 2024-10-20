@@ -17,7 +17,7 @@ import yaml
 
 import qt3utils
 from qt3utils.datagenerators import plescanner
-from qt3utils.applications.controllers.nidaqedgecounter import QT3ScanNIDAQEdgeCounterController
+from qt3utils.applications.controllers.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
 
 matplotlib.use('Agg')
 
@@ -86,7 +86,7 @@ class DataViewport:
 
         # Look for the single DAQ reader and get the image data
         for reader in model.readers:
-            if isinstance(model.readers[reader], QT3ScanNIDAQEdgeCounterController):
+            if isinstance(model.readers[reader], QT3PleNIDAQEdgeCounterController):
                 img_data = np.array([output[reader] for output in model.outputs])
 
         # Calculate the axis extent
@@ -573,7 +573,7 @@ class ScanPopoutApplication():
             # Get the full image data
             # Maybe can remove if we update image data at the popout window level?
             for reader in self.application_controller.readers:
-                if isinstance(self.application_controller.readers[reader], QT3ScanNIDAQEdgeCounterController):
+                if isinstance(self.application_controller.readers[reader], QT3PleNIDAQEdgeCounterController):
                     img_data = np.array([output[reader] for output in self.application_controller.outputs])
             # Write the image data to file
             ds = df.create_dataset('data/scan_counts', data=img_data)
@@ -732,7 +732,6 @@ class MainTkApplication():
                 self.auxiliary_control_models['RepumpController'].go_to(
                     v=self.auxiliary_control_models['RepumpController'].minimum_allowed_voltage)
                 self.enable_buttons()
-
 
     def start_scan(self, event=None) -> None:
         '''

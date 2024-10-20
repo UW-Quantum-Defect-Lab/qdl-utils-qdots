@@ -5,7 +5,7 @@ from typing import Type
 
 import numpy as np
 
-from qt3utils.applications.controllers.nidaqedgecounter import QT3ScanNIDAQEdgeCounterController, QT3ScopeNIDAQEdgeCounterController
+from qt3utils.applications.controllers.nidaqedgecounter import QT3ScanNIDAQEdgeCounterController, QT3PleNIDAQEdgeCounterController
 from qt3utils.applications.controllers.wavemeter_controller import WavemeterController
 from qt3utils.applications.controllers.lockin_controller import Lockin
 from qt3utils.nidaq.customcontrollers import WavelengthControlBase, VControl
@@ -384,7 +384,7 @@ class PleScanner:
                 # Check if reader is the desired class.
                 # Everything in here probably needs to be in a separate thread target
                 # function and additional threads need to be launched for other readers
-                if isinstance(self.readers[reader], QT3ScanNIDAQEdgeCounterController):
+                if isinstance(self.readers[reader], QT3PleNIDAQEdgeCounterController):
                     #self.rate_counters.append(self.readers[reader]) # I don't know what this line does --- doesn't look like it is used at all? Maybe to catch a stop?
 
                     # This samples one batch consisting of N clock cycles on the DAQ
@@ -413,7 +413,7 @@ class PleScanner:
             logger.debug(f'Move to voltage: {voltage}')
             # Same as before; must be modified accordingly to handle multiple readers.
             for reader in self.readers:
-                if isinstance(self.readers[reader], QT3ScanNIDAQEdgeCounterController):
+                if isinstance(self.readers[reader], QT3PleNIDAQEdgeCounterController):
                     raw_counts_at_sample = self.readers[reader].sample_counts(1, self.sample_time_down)
                     # Now saving to downsweep dictionary
                     raw_output_at_samples_down[reader].append(raw_counts_at_sample)
@@ -430,7 +430,7 @@ class PleScanner:
         for reader in self.readers:
             # Logic for processing each type of reader will depend on the output structure
             # of the corresponding reader. Thus, each type should be implemented separately
-            if isinstance(self.readers[reader], QT3ScanNIDAQEdgeCounterController):
+            if isinstance(self.readers[reader], QT3PleNIDAQEdgeCounterController):
 
                 # Remove the extra dimension(s)
                 raw_output_up = np.array(raw_output_at_samples_up[reader]).squeeze()

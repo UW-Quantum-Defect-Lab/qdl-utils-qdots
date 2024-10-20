@@ -295,4 +295,42 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
 
 
 
+class NiDaqTimedDigitalInputRateCounter(NiDaqDigitalInputRateCounter):
+
+    '''
+    This class is an alternative version of its parent class
+    `NiDaqDigitalInputRateCounter` which replaces the number of samples
+    per batch with the time per sample (in seconds) as the fundamental 
+    measure for the sampling time.
+    
+    This enables users to specify the measurement time and configure it
+    at the lowest possible level.
+    '''
+
+    def __init__(self, daq_name = 'Dev1',
+                       signal_terminal = 'PFI0',
+                       clock_rate = 100000,
+                       sample_time_in_seconds = 1,
+                       clock_terminal = None,
+                       read_write_timeout = 10,
+                       signal_counter = 'ctr2',
+                       trigger_terminal = None,
+                       ):
+        # Get the sample time in seconds
+        self.sample_time_in_seconds = sample_time_in_seconds
+
+        # Compute the number of cycles per batch such that one
+        # batch is `self.sample_time_in_seconds` long
+        num_data_samples_per_batch = clock_rate * sample_time_in_seconds
+
+        # Init the parent NiDaqDigitalInputRateCounter class
+        super().__init__(daq_name = daq_name,
+                         signal_terminal = signal_terminal,
+                         clock_rate = clock_rate,
+                         num_data_samples_per_batch = num_data_samples_per_batch,
+                         clock_terminal = clock_terminal,
+                         read_write_timeout = read_write_timeout,
+                         signal_counter = signal_counter,
+                         trigger_terminal = trigger_terminal)
+
 
