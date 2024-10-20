@@ -117,7 +117,6 @@ class CounterAndScanner:
         """
         raw_counts = []
         self.stage_controller.go_to_position(**{axis: min})
-        self.rate_counter.sample_time = self.rate_counter.num_data_samples_per_batch / self.clock_rate
         time.sleep(self.raster_line_pause)
         for val in np.arange(min, max + step_size, step_size):
             if self.stage_controller:
