@@ -1,6 +1,3 @@
-This is the initial fork from the qt3utils repo. We are migrating this to a new distinct repo.
--- NSY 19 October 2024
-
 # Utility Classes and Functions for the Quantum Defect Lab
 Forked from qt3-utils 9/23/2024. References not updated yet -- EQW 9/23/2024
 
