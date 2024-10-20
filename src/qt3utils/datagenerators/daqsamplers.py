@@ -125,7 +125,7 @@ class RateCounterBase(abc.ABC):
         """
         _data = np.sum(data_counts, axis=0)
         if _data[1] > 0:
-            return _data[0]/self.sample_time
+            return self.clock_rate * _data[0] / _data[1]
         else:
             return np.nan
 
@@ -230,9 +230,9 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
         if self.running is False: #external thread could have stopped
             return np.zeros(1),0
 
-        num_samples_per_channel = int(self.sample_time * self.clock_rate)
-        data_buffer = np.zeros(num_samples_per_channel)
-        self.nidaq_config.counter_task.timing.samp_quant_samp_per_chan = num_samples_per_channel
+        #num_samples_per_channel = int(self.sample_time * self.clock_rate)
+        data_buffer = np.zeros(self.num_data_samples_per_batch)
+        #self.nidaq_config.counter_task.timing.samp_quant_samp_per_chan = num_samples_per_channel
         samples_read = 0
 
         try:
@@ -244,7 +244,7 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
             logger.debug('reading data')
             samples_read = self.nidaq_config.counter_reader.read_many_sample_double(
                                     data_buffer,
-                                    number_of_samples_per_channel=num_samples_per_channel,
+                                    number_of_samples_per_channel=self.num_data_samples_per_batch,
                                     timeout=self.read_write_timeout)
             logger.debug(f'returned {samples_read} samples')
 
@@ -333,4 +333,44 @@ class NiDaqTimedDigitalInputRateCounter(NiDaqDigitalInputRateCounter):
                          signal_counter = signal_counter,
                          trigger_terminal = trigger_terminal)
 
+    # This is a copy of the self._read_samples() method which uses the 
+    # sample time to determine the number of cycles per batch
+    # We probably will want to remove this once we clean up the implementation
+    # in PleScanner to configure the scan time before/after each scan,
+    # rather than before each sample.
+    def _read_samples(self):
+
+        if self.running is False: #external thread could have stopped
+            return np.zeros(1),0
+
+        num_samples_per_channel = int(self.sample_time * self.clock_rate)
+        data_buffer = np.zeros(num_samples_per_channel)
+        self.nidaq_config.counter_task.timing.samp_quant_samp_per_chan = num_samples_per_channel
+        samples_read = 0
+
+        try:
+            self.read_lock = True
+            logger.debug('starting counter task')
+            self.nidaq_config.counter_task.wait_until_done()
+            self.nidaq_config.counter_task.start()
+
+            logger.debug('reading data')
+            samples_read = self.nidaq_config.counter_reader.read_many_sample_double(
+                                    data_buffer,
+                                    number_of_samples_per_channel=num_samples_per_channel,
+                                    timeout=self.read_write_timeout)
+            logger.debug(f'returned {samples_read} samples')
+
+        except Exception as e:
+            logger.error(f'{type(e)}: {e}')
+            raise e
+
+        finally:
+            try:
+                self.nidaq_config.counter_task.stop()
+            except Exception as e:
+                logger.error(f'in finally.stop. {type(e)}: {e}')
+
+            self.read_lock = False
+            return data_buffer, samples_read
 
