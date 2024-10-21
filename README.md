@@ -157,7 +157,7 @@ would have to `pip` install after each edit).
 
 
 Finally confirm that the installation worked correctly by launching the
-Python interpretter and then importing the package:
+Python interpreter and then importing the package:
 
 ```
 > Python
