@@ -1,24 +1,50 @@
-# Utility Classes and Functions for the Quantum Defect Lab
-Forked from qt3-utils 9/23/2024. References not updated yet -- EQW 9/23/2024
+# UW Quantum Defect Lab Utilities (base)
+This repository contains the base software tools and applications for interfacing
+with hardware used in the [Quantum Defect Laboratory](https://sites.google.com/uw.edu/optospintronics-lab/home) 
+at the University of Washington.
+This repository was initially forked from [`qt3-utils`](https://github.com/qt3uw/qt3-utils) 
+(developed for the Quantum Technologies Teaching and Test-Bed (QT3) lab,
+also at the University of Washington).
 
-This package provides a number of tools and fully-packaged programs for usage
-in the Quantum Technologies Teaching and Test-Bed (QT3) lab at the University of Washington.
+Currently, `qdl-utils` supports the following hardware for experiments with 
+solid-state optical emitters and spin-qubits:
 
-The QT3 lab confocal microscope utilizes the following hardware to perform
-various spin-control experiments on quantum systems, such as NV centers in diamond:
-
- * TTL pulsers
+* TTL pulsers
    * Quantum Composer Sapphire
    * Spin Core PulseBlaster
  * Excelitas SPCM for photon detection
  * NI-DAQ card (PCIx 6363) for data acquisition and control
  * Jena System's Piezo Actuator Stage Control Amplifier
- * [Future] spectrometer
 
-The code in this package facilitates usages of these devices to perform
-experiments.
+Additionally, several fully interfaced, Python applications are provided for 
+standard and commonly used experiments:
 
-# Setup
+* `qt3scope`: Real-time oscilloscope readout from the SPCM via the digital input 
+  terminal on the NI-DAQ board.
+* `qt3scan`: Reconfigurable 1-d and 2-d confocal scan imaging.
+* `qt3pb`: A simple GUI for controlling the pulse blaster.
+* `qt3ple`: Reconfigurable resonant excitation (photoluminescence excitation)
+  spectroscopy.
+
+Applications are generally structured to be easily configured for different
+setups (using supported hardware) via the use of YAML files.
+Modifications to include additional hardware should also be relatively straightforward.
+Finally, in the case where a custom one-off, experiment is required, many of the controllers 
+and hardware interfaces can be utilized directly without the development of a GUI
+or application.
+
+### Intended usage
+Currently this repository is still under development to add generic, widely used
+functionality.
+Once these features have been added, this repository will no longer be in active 
+development.
+Instead, users are expected to fork from this repository and actively maintain their forks
+with their own applications and hardware.
+In the event that specific features or changes are of generic interest to multiple users,
+this repository may be merged/updated via a Pull Request.
+
+
+## Setup
 
 ### Prerequisites
 
@@ -31,20 +57,116 @@ SpinCore for the PulseBlaster. These libraries must be installed separately.
 * [SpinCore's PulseBlaster](https://www.spincore.com/pulseblaster.html)
   * [spinAPI driver](http://www.spincore.com/support/spinapi/)
 
-## Installation
+### Installation
 
-Once the prerequisite packages have been installed, qt3utils can be installed from pip.
+Because this package is intended to be forked and customized for use in a
+variety of experimental setups, we do not intend to release this package on PyPI.
+Instead, users must clone `qdl-utils` (or their specific fork) onto their
+own machine and install it locally.
+Instructions for how to do this are provided below.
 
-### Normal Installation
+Note that Pull Requests (and commits to the `main` branch) on `qdl-utils` 
+will generally be rejected.
+Thus, it is strongly discouraged to install `qdl-utils` directly.
+Instructions for creating a fork are provided below as well.
+
+
+#### 0. Create your fork of the `qdl-utils` repository
+
+Follow [these instructions to create a fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) 
+via the GitHub web browser.
+For QDL members, create the fork in the QDL GitHub organization and name the fork 
+appropriately as to be distinguishable, e.g. `qdl-diamond`.
+
+Once the fork has been created on GitHub, move on to the next step.
+Do not clone your fork yet; we will do this in the next steps.
+
+If you wish to completely decouple from `qdl-utils` then you can follow [these
+instructions to detach your fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/detaching-a-fork).
+Note that this will prevent you from being able to Pull Request `qdl-utils` or
+straightforwardly merge updates onto your repository.
+
+#### 1. Create a development environment 
+
+It is highly recommended that you utilize some form of virtual environment to
+install your fork of `qdl-utils` (henceforth referred to as `qdl-utils` unless
+explicitly stated otherwise).
+It is assumed that you will use [Anaconda](https://docs.anaconda.com/anaconda/install/)
+or its lightweight version [Miniconda](https://docs.anaconda.com/miniconda/).
+
+Create a new virtual environment with Python 3.9
 
 ```
-pip install qt3utils
+> conda create --name qdlutils python=3.9
 ```
 
-The `qt3utils` package depends on a handful of other [qt3 packages](https://github.com/qt3uw) and will be installed for you by default.
-Additional information may also be [found here](https://github.com/qt3uw/qt3softwaredocs).
+and then activate it via
 
-#### Update Tk/Tcl
+```
+> conda activate qdlutils
+```
+
+Note: You can change the name of your environment from `qdlutils` to anything else,
+just make sure you remember it.
+
+
+#### 2. Clone your fork
+
+Navigate (in the terminal) to the directory in which you would like to install
+`qdl-utils`.
+Note that you will often need to edit the source code so pick a directory which
+you can easily access.
+
+Once your present working directory is the desired location, clone your fork via
+
+```
+> git clone URL_OF_YOUR_FORK
+```
+
+You can get the URL for your fork from its GitHub page by clicking on the greend 
+"Code" button as shown in the following picture:
+
+![repo_url](https://github.com/user-attachments/assets/0396ff47-59e1-47fa-a7d9-053b81d58298)
+
+For example, if we wanted to install the `qdl-utils` repo itself we could run
+`git clone https://github.com/UW-Quantum-Defect-Lab/qdl-utils.git`.
+Note that, for reasons explained above, cloning `qdl-utils` directly is not
+recommended.
+
+
+#### 3. Install the local repository in "editor" mode
+
+Finally, move into the the newly created clone of your repository
+
+```
+> cd NAME_OF_YOUR_FORK
+```
+
+and then install it locally via
+
+```
+> pip install -e . 
+```
+
+Do not forget the `.`! 
+This refers `pip` to the `pyproject.toml` file in the home directory
+of the repository that does the installation.
+The `-e` option ensures that any edits you make to the local repository 
+are reflected in subsequent imports in Python scripts (without this you
+would have to `pip` install after each edit).
+
+
+Finally confirm that the installation worked correctly by launching the
+Python interpretter and then importing the package:
+
+```
+> Python
+Python 3.9 ...
+>>> import qt3utils
+>>>
+```
+
+#### 4. (Optional) Update Tk/Tcl
 
 Upgrading Tcl/Tk via Anaconda overcomes some GUI bugs on Mac OS Sonoma
 
@@ -52,8 +174,19 @@ Upgrading Tcl/Tk via Anaconda overcomes some GUI bugs on Mac OS Sonoma
 conda install 'tk>=8.6.13'
 ```
 
+&nbsp;
 
-# Usage
+&nbsp;
+
+&nbsp;
+
+&nbsp;
+
+# (Everything below here will be migrated to a different location)
+
+
+
+### Usage
 
 This package provides GUI applications and a Python API for controlling the hardware and running experiments.
 
