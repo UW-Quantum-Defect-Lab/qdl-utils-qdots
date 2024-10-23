@@ -36,6 +36,7 @@ QDLMOVE:
       zero_microns_volt_offset: 5
       min_position: -40.0
       max_position: 40.0
+      invert_axis: True
 
   PiezoY:
     import_path : qt3utils.applications.qdlmove.nidaqpiezo
@@ -49,6 +50,7 @@ QDLMOVE:
       zero_microns_volt_offset: 5
       min_position: -40.0
       max_position: 40.0
+      invert_axis: True
 
   PiezoZ:
     import_path : qt3utils.applications.qdlmove.nidaqpiezo
@@ -62,3 +64,4 @@ QDLMOVE:
       zero_microns_volt_offset: 5
       min_position: -40.0
       max_position: 40.0
+      invert_axis: True
