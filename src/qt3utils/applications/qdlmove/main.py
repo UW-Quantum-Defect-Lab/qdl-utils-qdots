@@ -39,6 +39,11 @@ class PositionControllerApplication():
 
         # ===============================================================================
         # Edit here to add more controllers
+        # ===============================================================================
+        
+        # 1. MAKE EDITS IN `application_gui.py`
+        
+        # 3. CREATE A CONTROLLER FOR YOUR STAGE:
         # Names must match the relevant entries in the YAML configuration file
         # This creates a controller for the specified axes
         # Edit the relevant section in `application_gui.py` to change the names
@@ -49,7 +54,7 @@ class PositionControllerApplication():
                                     axis_1_controller_name='MicroX', 
                                     axis_2_controller_name='MicroY',
                                     read_precision=0)
-        self.micros_application = ThreeAxisApplicationControl(
+        self.piezos_application = ThreeAxisApplicationControl(
                                     parent=self, 
                                     gui=self.view.piezos_view, 
                                     axis_1_controller_name='PiezoX', 
@@ -57,7 +62,15 @@ class PositionControllerApplication():
                                     axis_3_controller_name='PiezoZ',
                                     read_precision=2)
         
-        # ===========================================
+        # 4. ADD THOSE CONTROLLERS TO THIS LIST
+        # This list is used to keep track of the controllers to ensure that the stepping
+        # does not overlap.
+        self.movement_controllers = [self.micros_application,
+                                     self.piezos_application]
+
+        # ===============================================================================
+        # No edits below here!
+        # ===============================================================================
         
         # Set the focus to the root when hitting enter
         self.root.bind('<Return>', self.refocus)
@@ -209,6 +222,15 @@ class TwoAxisApplicationControl():
         Sets enables or disables stepping depending on the state.
         '''
         if (self.gui.stepping_active.get() == 1):
+
+            # Disable the other stepping checkboxes if they are active
+            for controller in self.parent.movement_controllers:
+                if controller is not self and (controller.gui.stepping_active.get() == 1):
+                    # Uncheck the box
+                    controller.gui.stepping_active.set(0)
+                    # Toggle the stepping
+                    controller.toggle_stepping()
+            # Bind the keys to root
             self.parent.root.bind('<Left>', self.step_axis_1)
             self.parent.root.bind('<Right>', self.step_axis_1)
             self.parent.root.bind('<Up>', self.step_axis_2)
@@ -367,8 +389,14 @@ class ThreeAxisApplicationControl():
         Sets enables or disables stepping depending on the state.
         '''
         if (self.gui.stepping_active.get() == 1):
-            #self.stepping_active = True
-            # Similarly bind the keyboard focus to the root application
+            # Disable the other stepping checkboxes if they are active
+            for controller in self.parent.movement_controllers:
+                if controller is not self and (controller.gui.stepping_active.get() == 1):
+                    # Uncheck the box
+                    controller.gui.stepping_active.set(0)
+                    # Toggle the stepping
+                    controller.toggle_stepping()
+            # Bind the keys to root
             self.parent.root.bind('<Left>', self.step_axis_1)
             self.parent.root.bind('<Right>', self.step_axis_1)
             self.parent.root.bind('<Up>', self.step_axis_2)

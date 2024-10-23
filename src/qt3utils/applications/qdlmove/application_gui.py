@@ -11,6 +11,9 @@ class PositionControllerApplicationView():
         frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=16, pady=16)
 
         # ===============================================================================
+        # Edit here to add more controllers
+        # ===============================================================================
+        # 2. ADD APPLICATION CONTROLLER GUIs HERE
         # Edit here to add more movement control
         # This creates a GUI element for the specified axes with the provided names.
         # You must make a controller of the right type and with correct associations
@@ -26,6 +29,8 @@ class PositionControllerApplicationView():
                                                     axis_3_label='Z axis')
 
 
+        # ===============================================================================
+        # No edits below here!
         # ===============================================================================
 
         

@@ -1,4 +1,3 @@
-import abc
 import logging
 import nidaqmx
 import numpy as np
@@ -18,7 +17,8 @@ class NiDaqPiezoController:
                  scale_microns_per_volt: float=8,
                  zero_microns_volt_offset: float=5,
                  min_position: float = -40.0,
-                 max_position: float = 40.0) -> None:
+                 max_position: float = 40.0,
+                 invert_axis: bool = False) -> None:
         super().__init__()
 
         self.logger = logging.getLogger(__name__)
@@ -27,10 +27,19 @@ class NiDaqPiezoController:
         self.read_channel = read_channel
         self.scale_microns_per_volt = scale_microns_per_volt
         self.zero_microns_volt_offset = zero_microns_volt_offset
-        self.minimum_allowed_position = min_position
-        self.maximum_allowed_position = max_position
+        self.min_position = min_position
+        self.max_position = max_position
         self.settling_time_in_seconds = move_settle_time
+        self.invert_axis = invert_axis
         self.last_write_value = None
+
+        # Invert the axis if specified
+        # This just changes the `scale_microns_per_volt` and `zero_microns_volt_offset`
+        if self.invert_axis:
+            center_position = (self.min_position + self.max_position) / 2
+            center_voltage = self._microns_to_volts(center_position)
+            self.scale_microns_per_volt = -self.scale_microns_per_volt
+            self.zero_microns_volt_offset = center_voltage - (center_position / self.scale_microns_per_volt)
 
 
     def _microns_to_volts(self, microns: float) -> float:
@@ -50,9 +59,17 @@ class NiDaqPiezoController:
         self.read_channel = config_dict.get('read_channel', self.read_channel)
         self.scale_microns_per_volt = config_dict.get('scale_microns_per_volt', self.scale_microns_per_volt)
         self.zero_microns_volt_offset = config_dict.get('zero_microns_volt_offset', self.zero_microns_volt_offset)
-        self.minimum_allowed_position = config_dict.get('min_position', self.minimum_allowed_position)
-        self.maximum_allowed_position = config_dict.get('max_position', self.minimum_allowed_position)
+        self.min_position = config_dict.get('min_position', self.min_position)
+        self.max_position = config_dict.get('max_position', self.max_position)
         self.settling_time_in_seconds = config_dict.get('move_settle_time', self.settling_time_in_seconds)
+        self.invert_axis = config_dict.get('invert_axis', self.invert_axis)
+
+        # Invert the axis if specified
+        if self.invert_axis:
+            center_position = (self.min_position + self.max_position) / 2
+            center_voltage = self._microns_to_volts(center_position)
+            self.scale_microns_per_volt = -self.scale_microns_per_volt
+            self.zero_microns_volt_offset = center_voltage - (center_position / self.scale_microns_per_volt)
 
     def get_current_position(self) -> float:
         '''
@@ -75,10 +92,10 @@ class NiDaqPiezoController:
         position = float(position)
         if type(position) not in [type(1.0), type(1)]:
             raise TypeError(f'value {position} is not a valid type.')
-        if position < self.minimum_allowed_position:
-            raise ValueError(f'value {position} is less than {self.minimum_allowed_position: .3f}.')
-        if position > self.maximum_allowed_position:
-            raise ValueError(f'value {position} is greater than {self.maximum_allowed_position: .3f}.')
+        if position < self.min_position:
+            raise ValueError(f'value {position} is less than {self.min_position: .3f}.')
+        if position > self.max_position:
+            raise ValueError(f'value {position} is greater than {self.max_position: .3f}.')
 
 
     def go_to_position(self, position: float=None) -> None:
