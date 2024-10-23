@@ -146,21 +146,12 @@ class QT3ScanNIDAQEdgeCounterController(QT3ScopeNIDAQEdgeCounterController):
     def clock_rate(self) -> float:
         return self.data_generator.clock_rate
 
-    def sample_counts(self, num_batches: int, sample_time: float=-1) -> np.ndarray:
-        if sample_time > 0:
-            self.data_generator.sample_time = sample_time
+    def sample_counts(self, num_batches: int) -> np.ndarray:
         return self.data_generator.sample_counts(num_batches)
 
-    def sample_count_rate(self, data_counts: np.ndarray) -> np.ndarray:
+    def sample_count_rate(self, data_counts: np.ndarray) -> np.floating:
         return self.data_generator.sample_count_rate(data_counts)
 
-    @property
-    def num_data_samples_per_batch(self) -> int:
-        return self.data_generator.num_data_samples_per_batch
-
-    @num_data_samples_per_batch.setter
-    def num_data_samples_per_batch(self, value: int):
-        self.data_generator.num_data_samples_per_batch = value
 
 
 class QT3PleNIDAQEdgeCounterController(QT3ScopeNIDAQEdgeCounterController):
