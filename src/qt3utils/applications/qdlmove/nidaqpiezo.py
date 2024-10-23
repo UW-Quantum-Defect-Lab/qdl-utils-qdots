@@ -7,7 +7,7 @@ import time
 class NiDaqPiezoController:
     '''
     A class to control the voltage output from an NIDAQ board to control
-    one axis of a Janis piezo.
+    one axis of a voltage controlled piezo actuator.
     '''
 
     def __init__(self, 
@@ -45,13 +45,14 @@ class NiDaqPiezoController:
         '''
         This method is used to configure the data controller.
         '''
-        self.device_name = config_dict.get('daq_name', self.device_name)
-        self.write_channel = config_dict.get('write_channels', self.write_channel)
-        self.read_channel = config_dict.get('read_channels', self.read_channel)
+        self.device_name = config_dict.get('device_name', self.device_name)
+        self.write_channel = config_dict.get('write_channel', self.write_channel)
+        self.read_channel = config_dict.get('read_channel', self.read_channel)
         self.scale_microns_per_volt = config_dict.get('scale_microns_per_volt', self.scale_microns_per_volt)
         self.zero_microns_volt_offset = config_dict.get('zero_microns_volt_offset', self.zero_microns_volt_offset)
         self.minimum_allowed_position = config_dict.get('min_position', self.minimum_allowed_position)
-        self.maximum_allowed_position = config_dict.get('max_position', self.maximum_allowed_position)
+        self.maximum_allowed_position = config_dict.get('max_position', self.minimum_allowed_position)
+        self.settling_time_in_seconds = config_dict.get('move_settle_time', self.settling_time_in_seconds)
 
     def get_current_position(self) -> float:
         '''
@@ -64,7 +65,7 @@ class NiDaqPiezoController:
             with nidaqmx.Task() as vread, nidaqmx.Task():
                 vread.ai_channels.add_ai_voltage_chan(self.device_name + '/' + self.read_channel, min_val=0, max_val=10.0)
                 output = vread.read()
-        return output
+        return self._volts_to_microns(output)
 
 
     def _validate_value(self, position: float) -> None:
@@ -90,14 +91,14 @@ class NiDaqPiezoController:
             self._validate_value(position)
             with nidaqmx.Task() as task:
                 task.ao_channels.add_ao_voltage_chan(self.device_name + '/' + self.write_channel)
-                task.write(position)
+                task.write(self._microns_to_volts(position))
                 self.last_write_value = position
-            debug_string.append(f'positionv: {position:.2f}')
-        self.logger.debug(f'go to voltage {" ".join(debug_string)}')
+            debug_string.append(f'position: {position:.2f}')
+        self.logger.debug(f'Go to position {" ".join(debug_string)}')
         # Wait at new position if desired
         if self.settling_time_in_seconds > 0:
             time.sleep(self.settling_time_in_seconds)
-        self.logger.debug(f'last write: {self.last_write_value}')
+        self.logger.debug(f'Last write: {self.last_write_value}')
 
 
     def step_position(self, dx: float=None) -> None:

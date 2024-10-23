@@ -9,7 +9,7 @@ from qt3utils.applications.qdlmove.application_gui import PositionControllerAppl
 from qt3utils.applications.qdlmove.application_controller import MovementController
 
 from qt3utils.applications.qdlmove.newportmicrometer import NewportMicrometer
-from qt3utils.applications.qdlmove.nidaqjanispiezo import NiDaqPiezoController
+from qt3utils.applications.qdlmove.nidaqpiezo import NiDaqPiezoController
 
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,10 @@ class PositionControllerApplication():
                                     axis_3_controller_name='PiezoZ',
                                     read_precision=2)
         
-        # ===============================================================================
+        # ===========================================
+        
+        # Set the focus to the root when hitting enter
+        self.root.bind('<Return>', self.refocus)
 
     def configure_from_yaml(self, afile: str) -> None:
         '''
@@ -107,6 +110,18 @@ class PositionControllerApplication():
         '''
         yaml_path = importlib.resources.files(CONFIG_PATH).joinpath(yaml_filename)
         self.configure_from_yaml(str(yaml_path))
+
+    def refocus(self, tkinter_event=None):
+        '''
+        This method is called when the enter key is hit.
+        This resets the focus of the application onto the root window removing the
+        cursor from any entry widgets, enabling movement with keys without unintended
+        input into the entry widgets.
+        '''
+        logger.debug('Refocus triggered.')
+        if tkinter_event.keysym == 'Return':
+            logger.debug('Refocused successfully.')
+            self.root.focus_set()
 
 
     def run(self) -> None:
@@ -201,8 +216,10 @@ class TwoAxisApplicationControl():
             logger.info('Stepping active.')
         else:
             # Unbind all events tied to the root window
+            # except for the return key refocus
             for event in self.parent.root.bind():
-                self.parent.root.unbind(event)
+                if event != '<Key-Return>':
+                    self.parent.root.unbind(event)
             logger.info('Stepping inactive.')
 
 
@@ -342,6 +359,7 @@ class ThreeAxisApplicationControl():
             current_position = round(self.parent.positioners[self.axis_3_controller_name].read_position(),self.read_precision)
             self.gui.axis_3_set_entry.insert(0, current_position)
             self.set_axis_3()
+        pass
 
     def toggle_stepping(self):
         '''
@@ -361,18 +379,11 @@ class ThreeAxisApplicationControl():
             self.parent.root.bind('<minus>', self.step_axis_3)
             logger.info('Stepping active.')
         else:
-            #self.stepping_active = False
-            # Similarly bind the keyboard focus to the root application
-            '''self.parent.root.bind('<Left>', self._ignore_event)
-            self.parent.root.bind('<Right>', self._ignore_event)
-            self.parent.root.bind('<Up>', self._ignore_event)
-            self.parent.root.bind('<Down>', self._ignore_event)
-            # For the third axis, allow for '=' or '+' to zoom since numpad has '+'
-            self.parent.root.bind('<=>', self._ignore_event)
-            self.parent.root.bind('<+>', self._ignore_event)
-            self.parent.root.bind('<->', self._ignore_event)'''
+            # Unbind all events tied to the root window
+            # except for the return key refocus
             for event in self.parent.root.bind():
-                self.parent.root.unbind(event)
+                if event != '<Key-Return>':
+                    self.parent.root.unbind(event)
             logger.info('Stepping inactive.')
 
     def _ignore_event(self, event):
