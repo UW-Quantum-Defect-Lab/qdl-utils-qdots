@@ -11,7 +11,7 @@ class NiDaqPiezoController:
     '''
 
     def __init__(self, 
-                 device_name: str,
+                 device_name: str = 'Dev1',
                  write_channel: str = 'ao0',
                  read_channel: str = None,
                  move_settle_time: float = 0.0,
