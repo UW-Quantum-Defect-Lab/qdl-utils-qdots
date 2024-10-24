@@ -81,8 +81,10 @@ Instructions for creating a fork are provided below.
 
 Follow [these instructions to create a fork](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo) 
 via the GitHub web browser.
-For QDL members, create the fork in the QDL GitHub organization and name the fork 
-appropriately as to be distinguishable, e.g. `qdl-diamond`.
+For QDL members, create the fork to be owned by the UW-Quantum-Defect-Lab GitHub organization
+and name the fork appropriately as to be distinguishable for your project, e.g. `qdl-utils-diamond`
+or `qdl-utils-magpi`.
+For the purposes of this tutorial we will assume that the fork is named `my-qdl-utils-fork`.
 
 Once the fork has been created on GitHub, move on to the next step.
 Do not clone your fork yet; we will do this in the next steps.
@@ -95,8 +97,7 @@ straightforwardly merge updates onto your repository.
 #### 1. Create a development environment 
 
 It is highly recommended that you utilize some form of virtual environment to
-install your fork of `qdl-utils` (henceforth referred to as `my-qdl-utils-fork` for
-this example).
+install your fork `my-qdl-utils-fork` (in this example).
 It is assumed that you will use [Anaconda](https://docs.anaconda.com/anaconda/install/)
 or its lightweight version [Miniconda](https://docs.anaconda.com/miniconda/).
 If you are unfamiliar with `conda` please review [this tutorial](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
