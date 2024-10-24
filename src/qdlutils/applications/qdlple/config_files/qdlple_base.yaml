@@ -5,9 +5,9 @@ QT3PLE:
     configure :
       controller: VoltageController
       readers :
-        daq_reader : DAQCounter
+        - DAQCounter
       auxiliary_controllers :
-        daq_writer : RepumpController
+        - RepumpController
 
   DAQCounter:
     import_path : qdlutils.hardware.nidaq.counters.nidaqedgecounter
