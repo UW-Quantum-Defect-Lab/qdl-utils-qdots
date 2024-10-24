@@ -6,7 +6,7 @@ from typing import Generator
 import numpy as np
 import nidaqmx
 
-import qdlutils.nidaq
+import qdlutils.hardware.nidaq
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +207,7 @@ class NiDaqDigitalInputRateCounter(RateCounterBase):
         self.read_lock = False
 
     def _configure_daq(self):
-        self.nidaq_config = qdlutils.nidaq.EdgeCounter(self.daq_name)
+        self.nidaq_config = qdlutils.hardware.nidaq.EdgeCounter(self.daq_name)
 
         if self.clock_terminal is None:
             self.nidaq_config.configure_di_clock(clock_rate = self.clock_rate)

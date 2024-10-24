@@ -3,7 +3,7 @@ import numpy as np
 import tkinter as tk
 import logging
 
-import qdlutils.datagenerators.daqsamplers as daqsamplers
+import qdlutils.hardware.nidaq.counters.daqsamplers as daqsamplers
 from qdlutils.errors import convert_nidaq_daqnotfounderror
 
 module_logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
 QT3PLE:
   ApplicationController:
-    import_path : qdlutils.datagenerators.plescanner
+    import_path : qdlutils.applications.qdlple.application_controller
     class_name : PleScanner
     configure :
       controller: VoltageController
@@ -10,7 +10,7 @@ QT3PLE:
         daq_writer : RepumpController
 
   DAQCounter:
-    import_path : qdlutils.applications.controllers.nidaqedgecounter
+    import_path : qdlutils.hardware.nidaq.counters.nidaqedgecounter
     class_name  : QT3PleNIDAQEdgeCounterController
     configure :
       daq_name : Dev1  # NI DAQ Device Name
@@ -22,7 +22,7 @@ QT3PLE:
       signal_counter : ctr2  # NI DAQ counter to use for counting the input signal, e.g. ctr0, ctr1, ctr2, or ctr3
 
   VoltageController:
-    import_path : qdlutils.nidaq.customcontrollers
+    import_path : qdlutils.hardware.nidaq.analogoutputs.customcontrollers
     class_name  : VControl
     configure :
       daq_name : Dev1  # NI DAQ Device Name
@@ -33,7 +33,7 @@ QT3PLE:
       scale_nm_per_volt: 1  # microns
 
   RepumpController:
-    import_path   : qdlutils.nidaq.customcontrollers
+    import_path   : qdlutils.hardware.nidaq.analogoutputs.customcontrollers
     class_name    : ArbitraryDAQVoltageController
     configure :
       daq_name : Dev2  # NI DAQ Device Name

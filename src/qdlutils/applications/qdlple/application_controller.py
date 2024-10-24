@@ -1,14 +1,10 @@
 import logging
 import time
-import tkinter as tk
-from typing import Type
 
 import numpy as np
 
-from qdlutils.hardware.nidaq.nidaqedgecounter import QT3ScanNIDAQEdgeCounterController, QT3PleNIDAQEdgeCounterController
-from qdlutils.applications.controllers.wavemeter_controller import WavemeterController
-from qdlutils.applications.controllers.lockin_controller import Lockin
-from qdlutils.nidaq.customcontrollers import WavelengthControlBase, VControl
+from qdlutils.hardware.nidaq.counters.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.analogoutputs.customcontrollers import WavelengthControlBase
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

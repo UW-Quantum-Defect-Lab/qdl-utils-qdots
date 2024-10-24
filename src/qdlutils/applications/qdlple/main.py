@@ -1,8 +1,6 @@
-import argparse
 import importlib
 import importlib.resources
 import logging
-import pickle
 import datetime
 import h5py
 from threading import Thread
@@ -16,38 +14,16 @@ import tkinter as tk
 import yaml
 
 import qdlutils
-from qdlutils.datagenerators import plescanner
-from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.counters.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
 
 matplotlib.use('Agg')
 
-parser = argparse.ArgumentParser(description='NI DAQ (PCIx 6363) / PLE Scanner',
-                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('-v', '--verbose', type=int, default=2, help='0 = quiet, 1 = info, 2 = debug.')
-parser.add_argument('-cmap', metavar='<MPL color>', default='Blues',
-                    help='Set the MatplotLib colormap scale')
-args = parser.parse_args()
-
 logger = logging.getLogger(__name__)
-logging.basicConfig()
+logging.basicConfig(level=logging.INFO)
 
-if args.verbose == 0:
-    logger.setLevel(logging.WARNING)
-if args.verbose == 1:
-    logger.setLevel(logging.INFO)
-if args.verbose == 2:
-    logger.setLevel(logging.DEBUG)
+CONFIG_PATH = 'qdlutils.applications.qdlple.config_files'
+DEFAULT_CONFIG_FILE = 'qdlple_base.yaml'
 
-NIDAQ_DEVICE_NAMES = ['NIDAQ Rate Counter', "Lockin & Wavemeter"]
-RANDOM_DAQ_DEVICE_NAME = 'Random Data Generator'
-
-DEFAULT_DAQ_DEVICE_NAME = NIDAQ_DEVICE_NAMES[0]
-
-CONTROLLER_PATH = 'qdlutils.applications.controllers'
-STANDARD_CONTROLLERS = {NIDAQ_DEVICE_NAMES[0] : 'nidaq_rate_counter.yaml',
-                        NIDAQ_DEVICE_NAMES[1] : 'nidaq_wm_ple.yaml'}
-
-SCAN_OPTIONS = ["Discrete", "Batches"]
 
 class DataViewport:
     '''
@@ -58,7 +34,7 @@ class DataViewport:
     TODO: Handle internal logic for writing image vs. integrated data to the screen
     '''
 
-    def __init__(self, mplcolormap='gray') -> None:
+    def __init__(self, mplcolormap='Blues') -> None:
         self.fig = plt.figure()
         self.ax = plt.gca()
         self.cbar = None
@@ -385,7 +361,7 @@ class ScanPopoutApplicationView():
         frame = tk.Frame(main_frame)
         frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.data_viewport = DataViewport(args.cmap)
+        self.data_viewport = DataViewport()
         self.control_panel = DataViewportControlPanel(main_frame, scan_settings=scan_settings)
 
         self.canvas = FigureCanvasTkAgg(self.data_viewport.fig, master=frame)
@@ -627,7 +603,7 @@ class MainTkApplication():
     '''
     Main application backend, launches the GUI and handles events
     '''
-    def __init__(self, controller_name) -> None:
+    def __init__(self, default_config_filename) -> None:
         '''
         Initializes the application.
         Args:
@@ -639,8 +615,6 @@ class MainTkApplication():
         self.data_acquisition_models = {}
         self.auxiliary_control_models = {}
         self.application_controller_constructor = None
-        self.meta_configs = None
-        self.app_meta_data = None
         self.scan_thread = None
 
         # List to keep track of child scan windows
@@ -650,7 +624,7 @@ class MainTkApplication():
         self.last_save_directory = 'C:/Users/Fu Lab NV PC/Documents' # Modify this for your system
 
         # Load the YAML file based off of `controller_name`
-        self.load_controller_from_name(application_controller_name=controller_name)
+        self.load_controller_from_name(yaml_filename=default_config_filename)
 
         # Initialize the root tkinter widget (window housing GUI)
         self.root = tk.Tk()
@@ -658,8 +632,7 @@ class MainTkApplication():
         self.view = MainApplicationView(self, 
                                         scan_range=[self.wavelength_controller_model.minimum_allowed_position, 
                                                     self.wavelength_controller_model.maximum_allowed_position])
-        self.view.controller_option = controller_name
-
+        
         # Bind the GUI buttons to callback functions
         self.view.control_panel.start_button.bind("<Button>", self.start_scan)
         self.view.control_panel.stop_button.bind("<Button>", self.stop_scan)
@@ -790,7 +763,6 @@ class MainTkApplication():
         self.disable_buttons()
 
         # Launch the thread
-        self.app_meta_data = args
         self.scan_thread = Thread(target=self.scan_thread_function)
         self.scan_thread.start()
 
@@ -825,34 +797,6 @@ class MainTkApplication():
                 'Check for other applications using resources. If not, you may need to restart the application.')
 
         self.enable_buttons()
-
-    def save_scan(self, event = None):
-        '''
-        Method is currently not implemented
-        '''
-        myformats = [('Pickle', '*.pkl')]
-        afile = tk.filedialog.asksaveasfilename(filetypes=myformats, defaultextension='.pkl')
-        logger.info(afile)
-        file_type = afile.split('.')[-1]
-        if afile is None or afile == '':
-            return # selection was canceled.
-        data = {}
-        data["Data"] = {}
-        if self.application_controller is not None:
-            for ii, scan_data in enumerate(self.application_controller.outputs):
-                data["Data"][f"Scan{ii}"] = {}
-                for reader in self.application_controller.readers:
-                    data["Data"][f"Scan{ii}"][reader] = scan_data[reader]
-        data["Metadata"] = []
-        if self.meta_configs is not None:
-            for meta_config in self.meta_configs:
-                data["Metadata"].append(meta_config)
-        if self.app_meta_data is not None:
-            data["ApplicationController"] = self.app_meta_data
-
-        if file_type == 'pkl':
-            with open(afile, 'wb') as f:
-                pickle.dump(data, f)
 
     def configure_from_yaml(self, afile=None) -> None:
         '''
@@ -983,14 +927,14 @@ class MainTkApplication():
             self.auxiliary_control_models[aux_ctrl] = aux_ctrl_model
 
 
-    def load_controller_from_name(self, application_controller_name: str) -> None:
+    def load_controller_from_name(self, yaml_filename: str) -> None:
         '''
         Loads the default yaml configuration file for the application controller.
 
         Should be called during instantiation of this class and should be the callback
         function for the support controller pull-down menu in the side panel
         '''
-        yaml_path = importlib.resources.files(CONTROLLER_PATH).joinpath(STANDARD_CONTROLLERS[application_controller_name])
+        yaml_path = importlib.resources.files(CONFIG_PATH).joinpath(yaml_filename)
         self.configure_from_yaml(str(yaml_path))
 
     def disable_buttons(self):
@@ -1053,7 +997,7 @@ class MainTkApplication():
 
 
 def main() -> None:
-    tkapp = MainTkApplication(DEFAULT_DAQ_DEVICE_NAME)
+    tkapp = MainTkApplication(DEFAULT_CONFIG_FILE)
     tkapp.run()
 
 
