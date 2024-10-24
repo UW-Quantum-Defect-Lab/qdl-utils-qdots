@@ -7,6 +7,13 @@ class NiDaqPiezoController:
     '''
     A class to control the voltage output from an NIDAQ board to control
     one axis of a voltage controlled piezo actuator.
+    Any piezo actuator which operates via NIDAQ analog output voltages
+    is compatable with this class.
+    Note that there is currently no logic for voltage input feedback 
+    as needed for position stabilization.
+
+    This is a positioner-specialized version of the generic single analog 
+    output voltage controller for NIDAQ boards.
     '''
 
     def __init__(self, 
@@ -43,9 +50,15 @@ class NiDaqPiezoController:
 
 
     def _microns_to_volts(self, microns: float) -> float:
+        '''
+        Internal conversion from a position in microns to volts on the DAQ
+        '''
         return microns / self.scale_microns_per_volt + self.zero_microns_volt_offset
 
     def _volts_to_microns(self, volts: float) -> float:
+        '''
+        Internal conversion from volts on the DAQ to position in microns
+        '''
         return self.scale_microns_per_volt * (volts - self.zero_microns_volt_offset)
 
 
@@ -120,7 +133,7 @@ class NiDaqPiezoController:
 
     def step_position(self, dx: float=None) -> None:
         '''
-        Steps the position of the piezo by dx
+        Steps the position of the piezo by dx (can be positive or negative)
         '''
         if self.last_write_value is not None:
             try:
@@ -128,4 +141,7 @@ class NiDaqPiezoController:
             except Exception as e:
                 self.logger.warning(e)
         else:
-            pass # error?
+            # Eventually would like to include a step to read in the position
+            # at this point if read-in was implemented.
+            # For now just raise an error.
+            raise Exception('No last write error provided, cannot step')

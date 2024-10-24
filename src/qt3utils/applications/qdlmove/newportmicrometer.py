@@ -5,13 +5,29 @@ import logging
 
 class NewportMicrometer():
     '''
-    Controller for Newport automated micrometers via serial port
+    Controller for Newport automated micrometers via serial port connection
     '''
     def __init__(self,
                  port: str='COM4',
                  min: float=0.0,
                  max: float=25000.0,
                  timeout: float=10):
+        '''
+        Parameters
+        ----------
+        port : str
+            A string of the communication port on which to open the channel.
+        min : float
+            Minimum position that the micrometer can be set.
+        max : float
+            Maximum position that the micrometer can be set.
+        timeout: float
+            Time in seconds until the controller aborts a movement.
+
+        Notes
+        -----
+        Specific serial connection properties can be modified in `self.open()`
+        '''
 
         self.port = port
         self.min = min
@@ -24,6 +40,15 @@ class NewportMicrometer():
         self.channel_open = False
 
     def go_to_position(self, position: float) -> None:
+
+        '''
+        Drives the micrometer to a desired position.
+
+        Parameters
+        ----------
+        position : float
+            The target position in micrometers.
+        '''
         
         # Check if the requested position is valid
         if self.is_valid_position(position):
@@ -65,7 +90,12 @@ class NewportMicrometer():
 
     def read_position(self) -> float:
         '''
-        Read the position of the micrometer
+        Read the position of the micrometer.
+
+        Returns
+        -------
+        position: float
+            Read position in micrometers.
         '''
         # Get the read command and write to serial
         command='1TP\r\n'
@@ -79,7 +109,12 @@ class NewportMicrometer():
 
     def step_position(self, dx: float) -> None:
         '''
-        Steps the micrometers dx steps along axis (can be positive or negative)
+        Steps the micrometers dx steps along axis
+
+        Parameters
+        ----------
+        dx: float
+            Step size in micrometers to move (can be positive or negative)
         '''
         if self.last_write_value is None:
             self.last_write_value = self.read_position()
@@ -89,7 +124,7 @@ class NewportMicrometer():
 
     def open(self) -> None:
         '''
-        Opens a serial connection to the micrometer
+        Opens a serial connection to the micrometer.
         '''
         self.ser = serial.Serial(
             port=self.port,
@@ -117,7 +152,7 @@ class NewportMicrometer():
 
     def close(self) -> None:
         '''
-        Closes the serial connection to micrometer
+        Closes the serial connection to micrometer.
         '''
         # Send the close command to serial
         self.ser.write('SE\r\n'.encode('utf-8'))
@@ -128,6 +163,12 @@ class NewportMicrometer():
     def configure(self, config_dict: dict) -> None:
         '''
         This method is used to configure the data controller.
+
+        Parameters
+        ----------
+        config_dict: float
+            Dictionary containing parameter value pairs to initialize 
+            the micrometer.
         '''
         self.port = config_dict.get('port', self.port)
         self.min = config_dict.get('min', self.min)
@@ -140,6 +181,11 @@ class NewportMicrometer():
     def is_valid_position(self, value):
         '''
         Validates if value is within the allowed range
+
+        Parameters
+        ----------
+        value: float, int
+            Checks if the value is within the range of the micrometer.
         '''
         return (value >= self.min) and (value <= self.max)
     

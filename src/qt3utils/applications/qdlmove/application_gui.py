@@ -2,7 +2,7 @@ import tkinter as tk
 
 class PositionControllerApplicationView():
     '''
-    Main Application GUI
+    Main Application GUI which houses the individual controller GUIs.
     '''
 
     def __init__(self, main_window: tk.Tk):
@@ -32,8 +32,6 @@ class PositionControllerApplicationView():
         # ===============================================================================
         # No edits below here!
         # ===============================================================================
-
-        
 
 
 class TwoAxisApplicationView():

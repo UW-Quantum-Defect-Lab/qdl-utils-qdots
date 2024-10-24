@@ -5,7 +5,11 @@ import logging
 import tkinter as tk
 import yaml
 
-from qt3utils.applications.qdlmove.application_gui import PositionControllerApplicationView, TwoAxisApplicationView, ThreeAxisApplicationView
+from qt3utils.applications.qdlmove.application_gui import (
+    PositionControllerApplicationView, 
+    TwoAxisApplicationView, 
+    ThreeAxisApplicationView
+    )
 from qt3utils.applications.qdlmove.application_controller import MovementController
 
 from qt3utils.applications.qdlmove.newportmicrometer import NewportMicrometer
@@ -21,6 +25,20 @@ DEFAULT_CONFIG_FILE = 'qdlmove_micros_and_piezos.yaml'
 
 
 class PositionControllerApplication():
+    '''
+    The main position controller application logic which coordinates the GUI inputs with
+    the `application_controller` backend.
+
+    Users who wish to customize or add new position controllers to their system should
+    edit this file in the designated regions, following directions in both this and
+    `qdlmove.application_gui` respectively.
+
+    Individual movement controllers are separated into two-, and three-axis versions
+    which handle different subsets of the axes. These both act identically and can be
+    instantiated multiple times to handle any number of movement controllers.
+    Currently only the `newportmicrometer` and `nidaqpiezo` are supported, however you 
+    should be able to easily add other hardware types.
+    '''
 
     def __init__(self, default_config_filename: str):
         
@@ -41,8 +59,8 @@ class PositionControllerApplication():
         # Edit here to add more controllers
         # ===============================================================================
         
-        # 1. MAKE EDITS IN `application_gui.py`
-        
+        # 1. FIRST MAKE EDITS IN `application_gui.py`.
+
         # 3. CREATE A CONTROLLER FOR YOUR STAGE:
         # Names must match the relevant entries in the YAML configuration file
         # This creates a controller for the specified axes
@@ -67,6 +85,11 @@ class PositionControllerApplication():
         # does not overlap.
         self.movement_controllers = [self.micros_application,
                                      self.piezos_application]
+        
+        # 5. ADD LOGIC FOR NEW TYPES OF HARDWARE
+        # If you are using new hardware types (i.e. not `nidaqpizeo` or 
+        # `newportmicrometer`) then you need to add logic for their start up to the 
+        # `__init__` methods of TwoAxisApplicationControl and ThreesAxisApplicationControl
 
         # ===============================================================================
         # No edits below here!
@@ -169,21 +192,10 @@ class TwoAxisApplicationControl():
         self.axis_2_controller_name = axis_2_controller_name
         self.read_precision = read_precision
 
-        #self.stepping_active = True # To enable/disable movement by keystrokes?
-
         # Bind keys to the parent application view
         self.gui.stepping_laser_toggle.config(command=self.toggle_stepping)
         self.gui.axis_1_set_button.bind("<Button>", self.set_axis_1)
         self.gui.axis_2_set_button.bind("<Button>", self.set_axis_2)
-        # For now we keep the keyboard focus on the root application to detect
-        # the arrow key presses. A more sophisticated version of this code
-        # could dynamically shift the keyboard focus to the GUI frame of this 
-        # application so that the step_axis_x callbacks would no longer need
-        # to check if `self.stepping_active`.
-        '''self.gui.base_frame.bind('<Left>', self.step_axis_1)
-        self.gui.base_frame.bind('<Right>', self.step_axis_1)
-        self.gui.base_frame.bind('<Up>', self.step_axis_2)
-        self.gui.base_frame.bind('<Down>', self.step_axis_2)'''
 
         # On startup the last write value of the positioners cannot generally be obtained
         # Unfortunately NIDAQ does not enable to to know the current set voltage of an AO
@@ -214,18 +226,20 @@ class TwoAxisApplicationControl():
             current_position = round(self.parent.positioners[self.axis_2_controller_name].read_position(),self.read_precision)
             self.gui.axis_2_set_entry.insert(0, current_position)
             self.set_axis_2()
-
+        # ===============================================================================
+        # Add more startup logic for new controllers here if needed
+        # ===============================================================================
 
     def toggle_stepping(self):
         '''
         Callback for when the toggle checkbox is clicked.
         Sets enables or disables stepping depending on the state.
         '''
+        # Check if the checkbox is checked in the GUI
         if (self.gui.stepping_active.get() == 1):
-
             # Disable the other stepping checkboxes if they are active
             for controller in self.parent.movement_controllers:
-                if controller is not self and (controller.gui.stepping_active.get() == 1):
+                if controller is not self and (controller.gui.stepping_active.get()==1):
                     # Uncheck the box
                     controller.gui.stepping_active.set(0)
                     # Toggle the stepping
@@ -253,11 +267,15 @@ class TwoAxisApplicationControl():
         # Get the position from the GUI element
         position = float(self.gui.axis_1_set_entry.get())
         # Set the axis
-        self.parent.application_controller.move_axis(axis_controller_name=self.axis_1_controller_name, position=position)
-        # Update the reader?
+        self.parent.application_controller.move_axis(
+            axis_controller_name=self.axis_1_controller_name, 
+            position=position)
+        # Update the reader
         self.gui.axis_1_readout_entry.config(state='normal')     
         self.gui.axis_1_readout_entry.delete(0,'end')
-        self.gui.axis_1_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_1_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_1_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_1_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_1_readout_entry.config(state='readonly')
 
     
@@ -269,10 +287,12 @@ class TwoAxisApplicationControl():
         position = float(self.gui.axis_2_set_entry.get())
         # Set the axis
         self.parent.application_controller.move_axis(axis_controller_name=self.axis_2_controller_name, position=position)
-        # Update the reader?
+        # Update the reader
         self.gui.axis_2_readout_entry.config(state='normal')     
         self.gui.axis_2_readout_entry.delete(0,'end')
-        self.gui.axis_2_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_2_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_2_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_2_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_2_readout_entry.config(state='readonly')
 
     def step_axis_1(self, tkinter_event=None):
@@ -292,10 +312,12 @@ class TwoAxisApplicationControl():
             self.parent.application_controller.step_axis(axis_controller_name=self.axis_1_controller_name, dx=dx)
         else:
             logger.warning('Axis 1 step key not identified')
-        # Update the reader?
+        # Update the reader
         self.gui.axis_1_readout_entry.config(state='normal')     
         self.gui.axis_1_readout_entry.delete(0,'end')
-        self.gui.axis_1_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_1_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_1_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_1_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_1_readout_entry.config(state='readonly')
     
     def step_axis_2(self, tkinter_event=None):
@@ -315,10 +337,12 @@ class TwoAxisApplicationControl():
             self.parent.application_controller.step_axis(axis_controller_name=self.axis_2_controller_name, dx=dx)
         else:
             logger.warning('Axis 2 step key not identified')
-        # Update the reader?
+        # Update the reader
         self.gui.axis_2_readout_entry.config(state='normal')     
         self.gui.axis_2_readout_entry.delete(0,'end')
-        self.gui.axis_2_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_2_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_2_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_2_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_2_readout_entry.config(state='readonly')
 
     
@@ -344,22 +368,11 @@ class ThreeAxisApplicationControl():
         self.axis_3_controller_name = axis_3_controller_name
         self.read_precision = read_precision
 
-
-        # Bind keys to the parent application view
+        # Bind buttons
         self.gui.stepping_laser_toggle.config(command=self.toggle_stepping)
         self.gui.axis_1_set_button.bind("<Button>", self.set_axis_1)
         self.gui.axis_2_set_button.bind("<Button>", self.set_axis_2)
         self.gui.axis_3_set_button.bind("<Button>", self.set_axis_3)
-        '''
-        # Similarly bind the keyboard focus to the root application
-        self.parent.root.bind('<Left>', self.step_axis_1)
-        self.parent.root.bind('<Right>', self.step_axis_1)
-        self.parent.root.bind('<Up>', self.step_axis_2)
-        self.parent.root.bind('<Down>', self.step_axis_2)
-        # For the third axis, allow for '=' or '+' to zoom since numpad has '+'
-        self.parent.root.bind('=', self.step_axis_3)
-        self.parent.root.bind('+', self.step_axis_3)
-        self.parent.root.bind('-', self.step_axis_3)'''
 
         # Initialize the GUI entries depending on the type of controller
         # See the TwoAxisApplicationController code for comments.
@@ -381,7 +394,9 @@ class ThreeAxisApplicationControl():
             current_position = round(self.parent.positioners[self.axis_3_controller_name].read_position(),self.read_precision)
             self.gui.axis_3_set_entry.insert(0, current_position)
             self.set_axis_3()
-        pass
+        # ===============================================================================
+        # Add more startup logic for new controllers here if needed
+        # ===============================================================================
 
     def toggle_stepping(self):
         '''
@@ -407,15 +422,12 @@ class ThreeAxisApplicationControl():
             self.parent.root.bind('<minus>', self.step_axis_3)
             logger.info('Stepping active.')
         else:
-            # Unbind all events tied to the root window
-            # except for the return key refocus
+            # Unbind all events tied to the root window except for the return key refocus
             for event in self.parent.root.bind():
                 if event != '<Key-Return>':
                     self.parent.root.unbind(event)
             logger.info('Stepping inactive.')
 
-    def _ignore_event(self, event):
-        return None
 
     # Call back functions for setting x,y positions and 
     def set_axis_1(self, tkinter_event=None):
@@ -425,11 +437,15 @@ class ThreeAxisApplicationControl():
         # Get the position from the GUI element
         position = float(self.gui.axis_1_set_entry.get())
         # Set the axis
-        self.parent.application_controller.move_axis(axis_controller_name=self.axis_1_controller_name, position=position)
-        # Update the reader?
+        self.parent.application_controller.move_axis(
+            axis_controller_name=self.axis_1_controller_name, 
+            position=position)
+        # Update the reader
         self.gui.axis_1_readout_entry.config(state='normal')     
         self.gui.axis_1_readout_entry.delete(0,'end')
-        self.gui.axis_1_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_1_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_1_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_1_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_1_readout_entry.config(state='readonly')
 
     
@@ -440,11 +456,14 @@ class ThreeAxisApplicationControl():
         # Get the position from the GUI element
         position = float(self.gui.axis_2_set_entry.get())
         # Set the axis
-        self.parent.application_controller.move_axis(axis_controller_name=self.axis_2_controller_name, position=position)
-        # Update the reader?
+        self.parent.application_controller.move_axis(
+            axis_controller_name=self.axis_2_controller_name, position=position)
+        # Update the reader
         self.gui.axis_2_readout_entry.config(state='normal')     
         self.gui.axis_2_readout_entry.delete(0,'end')
-        self.gui.axis_2_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_2_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_2_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_2_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_2_readout_entry.config(state='readonly')
 
     def set_axis_3(self, tkinter_event=None):
@@ -454,11 +473,14 @@ class ThreeAxisApplicationControl():
         # Get the position from the GUI element
         position = float(self.gui.axis_3_set_entry.get())
         # Set the axis
-        self.parent.application_controller.move_axis(axis_controller_name=self.axis_3_controller_name, position=position)
-        # Update the reader?
+        self.parent.application_controller.move_axis(
+            axis_controller_name=self.axis_3_controller_name, position=position)
+        # Update the reader
         self.gui.axis_3_readout_entry.config(state='normal')     
         self.gui.axis_3_readout_entry.delete(0,'end')
-        self.gui.axis_3_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_3_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_3_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_3_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_3_readout_entry.config(state='readonly')
 
     def step_axis_1(self, tkinter_event=None):
@@ -478,10 +500,12 @@ class ThreeAxisApplicationControl():
             self.parent.application_controller.step_axis(axis_controller_name=self.axis_1_controller_name, dx=dx)
         else:
             logger.warning('Axis 1 step key not identified')
-        # Update the reader?
+        # Update the reader
         self.gui.axis_1_readout_entry.config(state='normal')     
         self.gui.axis_1_readout_entry.delete(0,'end')
-        self.gui.axis_1_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_1_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_1_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_1_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_1_readout_entry.config(state='readonly')
     
     def step_axis_2(self, tkinter_event=None):
@@ -501,10 +525,12 @@ class ThreeAxisApplicationControl():
             self.parent.application_controller.step_axis(axis_controller_name=self.axis_2_controller_name, dx=dx)
         else:
             logger.warning('Axis 2 step key not identified')
-        # Update the reader?
+        # Update the reader
         self.gui.axis_2_readout_entry.config(state='normal')     
         self.gui.axis_2_readout_entry.delete(0,'end')
-        self.gui.axis_2_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_2_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_2_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_2_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_2_readout_entry.config(state='readonly')
 
     def step_axis_3(self, tkinter_event=None):
@@ -524,10 +550,12 @@ class ThreeAxisApplicationControl():
             self.parent.application_controller.step_axis(axis_controller_name=self.axis_3_controller_name, dx=dx)
         else:
             logger.warning('Axis 3 step key not identified')
-        # Update the reader?
+        # Update the reader
         self.gui.axis_3_readout_entry.config(state='normal')     
         self.gui.axis_3_readout_entry.delete(0,'end')
-        self.gui.axis_3_readout_entry.insert(0,round(self.parent.application_controller.positioners[self.axis_3_controller_name].last_write_value,self.read_precision))
+        self.gui.axis_3_readout_entry.insert(
+            0,round(self.parent.application_controller.positioners[self.axis_3_controller_name].last_write_value,
+                    self.read_precision))
         self.gui.axis_3_readout_entry.config(state='readonly')
 
 
