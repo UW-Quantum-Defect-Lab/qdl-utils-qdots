@@ -4,7 +4,7 @@ import time
 import numpy as np
 
 from qdlutils.hardware.nidaq.counters.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
-from qdlutils.hardware.nidaq.analogoutputs.customcontrollers import WavelengthControlBase
+from qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage import NidaqVoltageController
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +24,7 @@ class PleScanner:
 
     def __init__(self, 
                  readers: dict, 
-                 wavelength_controller: WavelengthControlBase,
+                 wavelength_controller: NidaqVoltageController,
                  auxiliary_controllers: dict = {}) -> None:
         '''
         Args:
@@ -120,7 +120,7 @@ class PleScanner:
         Set the wavelength controller to desired point
         '''
         try:
-            self.wavelength_controller.go_to(wl_point)
+            self.wavelength_controller.go_to_voltage(voltage = wl_point)
         except ValueError as e:
             logger.info(f'Out of range\n\n{e}')
 
@@ -223,8 +223,8 @@ class PleScanner:
         # First step is to validate the inputs
         # Check if the voltage limits are valid
         if max > min:
-            self.wavelength_controller.check_allowed_limits(v=min)
-            self.wavelength_controller.check_allowed_limits(v=max)
+            self.wavelength_controller.validate_value(voltage=min)
+            self.wavelength_controller.validate_value(voltage=max)
         else:
             raise ValueError(f'Requested max {max:.3f} is less than min {min:.3f}.')
         # Check if pixel numbers are valid
@@ -345,7 +345,7 @@ class PleScanner:
         output = {key: [] for key in self.readers.keys()}
         
         # Set the wavelength to the start position
-        self.wavelength_controller.go_to(wl_point=self.min)
+        self.wavelength_controller.go_to_voltage(voltage=self.min)
 
         # Define a dictionary to store the raw outputs at each voltage sample.
         raw_output_at_samples_up = {key: [] for key in self.readers.keys()}
@@ -365,7 +365,7 @@ class PleScanner:
         for voltage in self.sample_voltages_up:
 
             # Go to the voltage
-            self.wavelength_controller.go_to(wl_point=voltage)
+            self.wavelength_controller.go_to_voltage(voltage=voltage)
             logger.debug(f'Move to voltage: {voltage}')
 
             # We want to eventually handle multiple readers simultaneously
@@ -405,7 +405,7 @@ class PleScanner:
         # Now scan the voltages down
         for voltage in self.sample_voltages_down:
             # Go to the voltage
-            self.wavelength_controller.go_to(wl_point=voltage)
+            self.wavelength_controller.go_to_voltage(voltage=voltage)
             logger.debug(f'Move to voltage: {voltage}')
             # Same as before; must be modified accordingly to handle multiple readers.
             for reader in self.readers:
@@ -417,7 +417,7 @@ class PleScanner:
         # Log end of downsweep
         logger.info(f'Finished downsweep on scan {self.current_frame+1}')
         # Return to start position
-        self.wavelength_controller.go_to(wl_point=self.min)
+        self.wavelength_controller.go_to_voltage(voltage=self.min)
         logger.debug(f'Move to voltage: {voltage}')
 
         # Write the raw data to the class instance?
@@ -478,11 +478,11 @@ class PleScanner:
         # Log repump
         logger.info(f'Repump for {self.time_repump} ms')
         # Turn on the pump laser
-        repump_controller.go_to(v=repump_controller.maximum_allowed_voltage)
+        repump_controller.go_to_voltage(voltage=repump_controller.max_voltage)
         # Wait for repump time
         time.sleep(self.time_repump * 0.001)
         # Turn off the pump laser
-        repump_controller.go_to(v=repump_controller.minimum_allowed_voltage)
+        repump_controller.go_to_voltage(voltage=repump_controller.max_voltage)
 
 
     def __del__(self):

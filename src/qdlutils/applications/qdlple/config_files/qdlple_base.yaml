@@ -22,19 +22,19 @@ QT3PLE:
       signal_counter : ctr2  # NI DAQ counter to use for counting the input signal, e.g. ctr0, ctr1, ctr2, or ctr3
 
   VoltageController:
-    import_path : qdlutils.hardware.nidaq.analogoutputs.customcontrollers
-    class_name  : VControl
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage
+    class_name  : NidaqVoltageController
     configure :
       daq_name : Dev1  # NI DAQ Device Name
       write_channels : ao3  # NI DAQ analog output channels to use for writing position
       read_channels : ai3  # NI DAQ analog input channels to use for reading position
-      min_position: -3  # conversion factor from volts to microns, can also supply a list [8,8,8] or [6,4.2,5]
-      max_position: 5  # the voltage value that defines the position 0,0,0, can also supply a list [0,0,0] or [5,5,5]
+      min_voltage: -3  # conversion factor from volts to microns, can also supply a list [8,8,8] or [6,4.2,5]
+      max_voltage: 5  # the voltage value that defines the position 0,0,0, can also supply a list [0,0,0] or [5,5,5]
       scale_nm_per_volt: 1  # microns
 
   RepumpController:
-    import_path   : qdlutils.hardware.nidaq.analogoutputs.customcontrollers
-    class_name    : ArbitraryDAQVoltageController
+    import_path   : qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage
+    class_name    : NidaqVoltageController
     configure :
       daq_name : Dev2  # NI DAQ Device Name
       write_channels : ao0  # NI DAQ analog output channels to use for writing position

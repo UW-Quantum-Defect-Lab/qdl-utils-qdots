@@ -59,8 +59,8 @@ class MainTkApplication():
         self.root = tk.Tk()
         # Create the main application GUI and specify the controller name
         self.view = MainApplicationView(self, 
-                                        scan_range=[self.wavelength_controller_model.minimum_allowed_position, 
-                                                    self.wavelength_controller_model.maximum_allowed_position])
+                                        scan_range=[self.wavelength_controller_model.min_voltage, 
+                                                    self.wavelength_controller_model.max_voltage])
         
         # Bind the GUI buttons to callback functions
         self.view.control_panel.start_button.bind("<Button>", self.start_scan)
@@ -89,7 +89,7 @@ class MainTkApplication():
         to change the voltage on the hardware.)
         '''
         self.disable_buttons()
-        self.wavelength_controller_model.go_to(float(self.view.control_panel.voltage_entry.get()))
+        self.wavelength_controller_model.go_to_voltage(float(self.view.control_panel.voltage_entry.get()))
         self.enable_buttons()
 
     def update_voltage_show(self, event=None) -> None:
@@ -123,16 +123,16 @@ class MainTkApplication():
             if ((self.view.control_panel.repump_laser_on.get() == 1) and cmd is None) or (cmd is True):
                 logger.info('Turning repump laser on.')
                 self.disable_buttons()
-                self.auxiliary_control_models['RepumpController'].go_to(
-                    v=self.auxiliary_control_models['RepumpController'].maximum_allowed_voltage)
+                self.auxiliary_control_models['RepumpController'].go_to_voltage(
+                    voltage=self.auxiliary_control_models['RepumpController'].max_voltage)
                 self.enable_buttons()
             # Else if the GUI toggle is off and no direct command is given
             # OR if the direct command is False then turn off the laser
             elif ((self.view.control_panel.repump_laser_on.get() == 0) and cmd is None) or (cmd is False):
                 logger.info('Turning repump laser off.')
                 self.disable_buttons()
-                self.auxiliary_control_models['RepumpController'].go_to(
-                    v=self.auxiliary_control_models['RepumpController'].minimum_allowed_voltage)
+                self.auxiliary_control_models['RepumpController'].go_to_voltage(
+                    voltage=self.auxiliary_control_models['RepumpController'].min_voltage)
                 self.enable_buttons()
 
     def start_scan(self, event=None) -> None:

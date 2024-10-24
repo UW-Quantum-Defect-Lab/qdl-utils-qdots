@@ -25,8 +25,8 @@ QDLMOVE:
       timeout: 10     # Time in seconds before timing out on movement
 
   PiezoX:
-    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezo
-    class_name  : NiDaqPiezoController
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqposition
+    class_name  : NidaqPositionController
     configure:
       device_name: Dev1
       write_channel: ao0
@@ -39,8 +39,8 @@ QDLMOVE:
       invert_axis: True             # If True, modifies scale and offset internally to invert axis
 
   PiezoY:
-    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezo
-    class_name  : NiDaqPiezoController
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqposition
+    class_name  : NidaqPositionController
     configure:
       device_name: Dev1
       write_channel: ao1
@@ -53,8 +53,8 @@ QDLMOVE:
       invert_axis: True
 
   PiezoZ:
-    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezo
-    class_name  : NiDaqPiezoController
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqposition
+    class_name  : NidaqPositionController
     configure:
       device_name: Dev1
       write_channel: ao2
