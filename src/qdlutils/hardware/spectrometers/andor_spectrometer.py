@@ -9,7 +9,7 @@ from typing import Tuple, Dict, Any, Union, TypeVar
 import numpy as np
 
 import qdlutils.datagenerators.spectrometers.andor as andor
-from qdlutils.applications.controllers.utils import (
+from qdlutils.hardware.spectrometers.utils import (
     make_label_and_entry,
     make_label_and_option_menu,
     make_label_and_check_button,

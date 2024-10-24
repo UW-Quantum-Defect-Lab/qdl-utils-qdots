@@ -5,6 +5,13 @@ from typing import Tuple, Optional, Union
 import nidaqmx
 import nipiezojenapy
 
+'''
+This currently implements a wrapper for the nipiezojenapy PiezoControl
+class and is used in qt3scan for movement control.
+The replacement of qt3scan with qdlscan should result in this file being 
+depreciated.
+'''
+
 
 class QT3ScanNIDAQPositionController:
 

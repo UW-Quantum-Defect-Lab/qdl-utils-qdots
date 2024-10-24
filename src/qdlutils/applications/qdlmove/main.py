@@ -12,8 +12,8 @@ from qdlutils.applications.qdlmove.application_gui import (
     )
 from qdlutils.applications.qdlmove.application_controller import MovementController
 
-from qdlutils.applications.qdlmove.newportmicrometer import NewportMicrometer
-from qdlutils.applications.qdlmove.nidaqpiezo import NiDaqPiezoController
+from qdlutils.hardware.micrometers.newportmicrometer import NewportMicrometer
+from qdlutils.hardware.nidaq.analogoutputs.nidaqpiezo import NiDaqPiezoController
 
 
 logger = logging.getLogger(__name__)

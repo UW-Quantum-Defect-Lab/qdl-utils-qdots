@@ -22,7 +22,7 @@ from qdlutils.applications.qt3scan.controller import (
     QT3ScanHyperSpectralApplicationController,
     STANDARD_COUNT_AGGREGATION_METHODS
 )
-from qdlutils.applications.controllers.utils import make_popup_window_and_take_threaded_action
+from qdlutils.hardware.spectrometers.utils import make_popup_window_and_take_threaded_action
 from qdlutils.applications.qt3scan.interface import (
     QT3ScanDAQControllerInterface,
     QT3ScanPositionControllerInterface,

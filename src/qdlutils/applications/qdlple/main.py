@@ -17,7 +17,7 @@ import yaml
 
 import qdlutils
 from qdlutils.datagenerators import plescanner
-from qdlutils.applications.controllers.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
 
 matplotlib.use('Agg')
 

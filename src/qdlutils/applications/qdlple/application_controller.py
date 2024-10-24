@@ -5,7 +5,7 @@ from typing import Type
 
 import numpy as np
 
-from qdlutils.applications.controllers.nidaqedgecounter import QT3ScanNIDAQEdgeCounterController, QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.nidaqedgecounter import QT3ScanNIDAQEdgeCounterController, QT3PleNIDAQEdgeCounterController
 from qdlutils.applications.controllers.wavemeter_controller import WavemeterController
 from qdlutils.applications.controllers.lockin_controller import Lockin
 from qdlutils.nidaq.customcontrollers import WavelengthControlBase, VControl
