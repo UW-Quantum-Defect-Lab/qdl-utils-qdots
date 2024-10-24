@@ -1,13 +1,13 @@
 QT3Scan:
   PositionController:
-    import_path : qdlutils.applications.controllers.random_data_generator    
+    import_path : qdlutils.hardware.simulatiors.random_data_generator    
     class_name  : QT3ScanDummyPositionController
     configure : 
       maximum_allowed_position : 80
       minimum_allowed_position : 0
 
   DAQController:
-    import_path : qdlutils.applications.controllers.random_data_generator
+    import_path : qdlutils.hardware.simulatiors.random_data_generator
     class_name  : QT3ScanRandomDataController
     configure : 
       simulate_single_light_source : True

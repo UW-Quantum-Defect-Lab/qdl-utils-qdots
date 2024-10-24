@@ -15,8 +15,8 @@ from matplotlib import pyplot as plt
 from matplotlib.backend_bases import MouseEvent
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-import qdlutils.nidaq
-import qdlutils.pulsers.pulseblaster
+import qdlutils.hardware.nidaq
+import qdlutils.hardware.pulsers.pulseblaster
 from qdlutils.applications.qt3scan.controller import (
     QT3ScanConfocalApplicationController,
     QT3ScanHyperSpectralApplicationController,
@@ -55,10 +55,10 @@ RANDOM_SPECTROMETER_DAQ_DEVICE_NAME = 'Random Spectrometer'
 
 DEFAULT_DAQ_DEVICE_NAME = NIDAQ_DAQ_DEVICE_NAME
 
-CONTROLLER_PATH = 'qdlutils.applications.controllers'
+CONTROLLER_PATH = 'qdlutils.applications.qt3scan.config_files'
 STANDARD_CONTROLLERS = {
     NIDAQ_DAQ_DEVICE_NAME: {
-        'yaml': 'nidaq_edge_counter.yaml',
+        'yaml': 'qt3scan_base.yaml',
         'application_controller_class': QT3ScanConfocalApplicationController
     },
     PRINCETON_SPECTROMETER_DAQ_DEVICE_NAME: {

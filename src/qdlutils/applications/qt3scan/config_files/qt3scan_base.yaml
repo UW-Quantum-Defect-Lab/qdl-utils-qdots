@@ -1,6 +1,6 @@
 QT3Scan:
   DAQController:
-    import_path : qdlutils.applications.controllers.nidaqedgecounter
+    import_path : qdlutils.hardware.nidaq.counters.nidaqedgecounter
     class_name  : QT3ScanNIDAQEdgeCounterController
     configure : 
       daq_name : Dev1  # NI DAQ Device Name
@@ -12,7 +12,7 @@ QT3Scan:
       signal_counter : ctr2  # NI DAQ counter to use for counting the input signal, e.g. ctr0, ctr1, ctr2, or ctr3
 
   PositionController:
-    import_path : qdlutils.applications.controllers.nidaqpiezocontroller    
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezocontroller    
     class_name  : QT3ScanNIDAQPositionController
     configure : 
       daq_name : Dev1  # NI DAQ Device Name

@@ -1,6 +1,6 @@
 QT3Scan:
   DAQController:
-    import_path : qdlutils.applications.controllers.random_data_generator
+    import_path : qdlutils.hardware.simulatiors.random_data_generator
     class_name  : QT3ScanRandomSpectrometerDataController
     configure :
       exposure_time : 500 # This is in ms
@@ -13,7 +13,7 @@ QT3Scan:
       num_wavelength_bins: 250
 
   PositionController:
-    import_path : qdlutils.applications.controllers.random_data_generator
+    import_path : qdlutils.hardware.simulatiors.random_data_generator
     class_name  : QT3ScanDummyPositionController
     configure :
       maximum_allowed_position : 80

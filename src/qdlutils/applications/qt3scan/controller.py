@@ -19,8 +19,10 @@ from qdlutils.applications.qt3scan.interface import (
     QT3ScanSpectrometerDAQControllerInterface,
 )
 
-import qdlutils.datagenerators
+import qdlutils.hardware.nidaq
 from qdlutils.errors import convert_nidaq_daqnotfounderror, QT3Error
+import qdlutils.hardware.nidaq.analogoutputs
+import qdlutils.hardware.nidaq.analogoutputs.piezoscanner
 
 matplotlib.use('Agg')
 
@@ -96,7 +98,7 @@ class QT3ScanConfocalApplicationController:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logger_level)
 
-        self.daq_and_scanner = qdlutils.datagenerators.CounterAndScanner(daq_controller, position_controller)
+        self.daq_and_scanner = qdlutils.hardware.nidaq.analogoutputs.piezoscanner.CounterAndScanner(daq_controller, position_controller)
         self.data_clock_rate = None
         self._raw_bg_counts = 0.
         self.data_configs = {'DAQ': None, 'Scanner': None}

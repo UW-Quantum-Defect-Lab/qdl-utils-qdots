@@ -1,6 +1,6 @@
 QT3Scan:
   DAQController:
-    import_path : qdlutils.applications.controllers.andor_spectrometer
+    import_path : qdlutils.hardware.spectrometers.andor_spectrometer
     class_name  : AndorSpectrometerController
     configure :
       # Devices
@@ -52,7 +52,7 @@ QT3Scan:
 
 # Settings for ARS Cryostat
   PositionController:
-    import_path : qdlutils.applications.controllers.nidaqpiezocontroller
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezocontroller
     class_name  : QT3ScanNIDAQPositionController
     configure :
       daq_name : Dev1  # NI DAQ Device Name
