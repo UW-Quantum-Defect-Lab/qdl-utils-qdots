@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import logging
 
-from qdlutils.pulsers.pulseblaster import PulseBlasterHoldAOM
+from qdlutils.hardware.pulsers.pulseblaster import PulseBlasterHoldAOM
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
