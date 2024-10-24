@@ -136,11 +136,11 @@ class QT3ScopeNIDAQEdgeCounterController:
         print(self.last_config_dict)  # we dont' use the logger because we want to be sure this is printed to stdout
 
 
+
 class QT3ScanNIDAQEdgeCounterController(QT3ScopeNIDAQEdgeCounterController):
     """
     Implements the qt3utils.applications.qt3scan.interface.QT3ScanCounterDAQControllerInterface for a NIDAQ edge counter.
     """
-
     def __init__(self, logger_level):
         super().__init__(logger_level)
 
@@ -153,3 +153,62 @@ class QT3ScanNIDAQEdgeCounterController(QT3ScopeNIDAQEdgeCounterController):
 
     def sample_count_rate(self, data_counts: np.ndarray) -> np.floating:
         return self.data_generator.sample_count_rate(data_counts)
+
+
+
+class QT3PleNIDAQEdgeCounterController(QT3ScopeNIDAQEdgeCounterController):
+    """
+    Implements the timed NIDAQ edge counter for PLE scans
+    """
+
+    def __init__(self, logger_level):
+        super().__init__(logger_level)
+
+        # Change the data generator to the timed input rate counter
+        self.data_generator = daqsamplers.NiDaqTimedDigitalInputRateCounter()
+
+    # Rewrite the configure function for the timed data generator
+    def configure(self, config_dict: dict) -> None:
+        """
+        This method is used to configure the data controller.
+        """
+        self.logger.debug("calling configure on the nidaq edge counter data controller")
+        self.last_config_dict.update(config_dict)
+
+        self.data_generator.daq_name = config_dict.get('daq_name', self.data_generator.daq_name)
+        self.data_generator.signal_terminal = config_dict.get('signal_terminal', self.data_generator.signal_terminal)
+        self.data_generator.clock_terminal = config_dict.get('clock_terminal', self.data_generator.clock_terminal)
+        self.data_generator.clock_rate = config_dict.get('clock_rate', self.data_generator.clock_rate)
+        self.data_generator.sample_time_in_seconds = config_dict.get('sample_time_in_seconds', self.data_generator.sample_time_in_seconds)
+        self.data_generator.read_write_timeout = config_dict.get('read_write_timeout', self.data_generator.read_write_timeout)
+        self.data_generator.signal_counter = config_dict.get('signal_counter', self.data_generator.signal_counter)
+
+
+    def sample_counts(self, num_batches: int, sample_time: float=-1) -> np.ndarray:
+        if sample_time > 0:
+            self.data_generator.sample_time = sample_time
+        return self.data_generator.sample_counts(num_batches)
+    
+    def sample_count_rate(self, data_counts: np.ndarray) -> np.ndarray:
+        return self.data_generator.sample_count_rate(data_counts)
+
+
+    @property
+    def clock_rate(self) -> float:
+        return self.data_generator.clock_rate
+
+    def sample_counts(self, num_batches: int, sample_time: float=-1) -> np.ndarray:
+        if sample_time > 0:
+            self.data_generator.sample_time = sample_time
+        return self.data_generator.sample_counts(num_batches)
+
+    def sample_count_rate(self, data_counts: np.ndarray) -> np.ndarray:
+        return self.data_generator.sample_count_rate(data_counts)
+
+    @property
+    def num_data_samples_per_batch(self) -> int:
+        return self.data_generator.num_data_samples_per_batch
+
+    @num_data_samples_per_batch.setter
+    def num_data_samples_per_batch(self, value: int):
+        self.data_generator.num_data_samples_per_batch = value
