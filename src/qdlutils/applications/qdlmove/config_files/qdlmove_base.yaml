@@ -7,7 +7,7 @@ QDLMOVE:
     - PiezoZ
 
   MicroX:
-    import_path : qdlutils.applications.qdlmove.newportmicrometer
+    import_path : qdlutils.hardware.micrometers.newportmicrometer
     class_name  : NewportMicrometer
     configure :
       port: COM4      # Serial port name
@@ -16,7 +16,7 @@ QDLMOVE:
       timeout: 10     # Time in seconds before timing out on movement
 
   MicroY:
-    import_path : qdlutils.applications.qdlmove.newportmicrometer
+    import_path : qdlutils.hardware.micrometers.newportmicrometer
     class_name  : NewportMicrometer
     configure :
       port: COM5      # Serial port name
@@ -25,7 +25,7 @@ QDLMOVE:
       timeout: 10     # Time in seconds before timing out on movement
 
   PiezoX:
-    import_path : qdlutils.applications.qdlmove.nidaqpiezo
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezo
     class_name  : NiDaqPiezoController
     configure:
       device_name: Dev1
@@ -39,7 +39,7 @@ QDLMOVE:
       invert_axis: True             # If True, modifies scale and offset internally to invert axis
 
   PiezoY:
-    import_path : qdlutils.applications.qdlmove.nidaqpiezo
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezo
     class_name  : NiDaqPiezoController
     configure:
       device_name: Dev1
@@ -53,7 +53,7 @@ QDLMOVE:
       invert_axis: True
 
   PiezoZ:
-    import_path : qdlutils.applications.qdlmove.nidaqpiezo
+    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezo
     class_name  : NiDaqPiezoController
     configure:
       device_name: Dev1

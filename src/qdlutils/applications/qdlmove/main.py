@@ -21,7 +21,7 @@ logging.basicConfig()
 
 
 CONFIG_PATH = 'qdlutils.applications.qdlmove.config_files'
-DEFAULT_CONFIG_FILE = 'qdlmove_micros_and_piezos.yaml'
+DEFAULT_CONFIG_FILE = 'qdlmove_base.yaml'
 
 
 class PositionControllerApplication():
