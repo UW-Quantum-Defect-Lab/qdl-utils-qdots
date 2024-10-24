@@ -1,6 +1,6 @@
 QT3Scope:
   DAQController:
-    import_path : qdlutils.applications.controllers.random_data_generator
+    import_path : qdlutils.hardware.simulators.random_data_generator
     class_name  : QT3ScopeRandomDataController
     configure : 
       simulate_single_light_source : False

@@ -47,8 +47,8 @@ RANDOM_DAQ_DEVICE_NAME = 'Random Data Generator'
 
 DEFAULT_DAQ_DEVICE_NAME = NIDAQ_DEVICE_NAME
 
-CONTROLLER_PATH = 'qdlutils.applications.controllers'
-SUPPORTED_CONTROLLERS = {NIDAQ_DEVICE_NAME: 'nidaq_edge_counter.yaml',
+CONTROLLER_PATH = 'qdlutils.applications.qt3scope.config_files'
+SUPPORTED_CONTROLLERS = {NIDAQ_DEVICE_NAME: 'qt3scope_base.yaml',
                          RANDOM_DAQ_DEVICE_NAME: 'random_data_generator.yaml',
                          }
 CONFIG_FILE_APPLICATION_NAME = 'QT3Scope'
