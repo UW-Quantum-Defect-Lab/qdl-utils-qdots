@@ -13,7 +13,7 @@ from qdlutils.applications.qdlmove.application_gui import (
 from qdlutils.applications.qdlmove.application_controller import MovementController
 
 from qdlutils.hardware.micrometers.newportmicrometer import NewportMicrometer
-from qdlutils.hardware.nidaq.analogoutputs.nidaqpiezo import NiDaqPiezoController
+from qdlutils.hardware.nidaq.analogoutputs.nidaqposition import NidaqPositionController
 
 
 logger = logging.getLogger(__name__)
@@ -205,8 +205,8 @@ class TwoAxisApplicationControl():
         # (there is probably a cleaner way of doing this).
         # For each axis we check for the type of instance and then force an update depending
         # on the type of hardware...
-        # If axis 1 is an NiDaqPiezoController...
-        if isinstance(self.parent.positioners[self.axis_1_controller_name], NiDaqPiezoController):
+        # If axis 1 is an NidaqPositionController...
+        if isinstance(self.parent.positioners[self.axis_1_controller_name], NidaqPositionController):
             # Initialize the value to zero on start up
             # Initial value in GUI for step is zero so setting the axis sets it to zero
             self.set_axis_1()
@@ -220,7 +220,7 @@ class TwoAxisApplicationControl():
             # Set the gui position
             self.set_axis_1()
         # Repeat for axis 2
-        if isinstance(self.parent.positioners[self.axis_2_controller_name], NiDaqPiezoController):
+        if isinstance(self.parent.positioners[self.axis_2_controller_name], NidaqPositionController):
             self.set_axis_2()
         if isinstance(self.parent.positioners[self.axis_2_controller_name], NewportMicrometer):
             current_position = round(self.parent.positioners[self.axis_2_controller_name].read_position(),self.read_precision)
@@ -376,19 +376,19 @@ class ThreeAxisApplicationControl():
 
         # Initialize the GUI entries depending on the type of controller
         # See the TwoAxisApplicationController code for comments.
-        if isinstance(self.parent.positioners[self.axis_1_controller_name], NiDaqPiezoController):
+        if isinstance(self.parent.positioners[self.axis_1_controller_name], NidaqPositionController):
             self.set_axis_1()
         if isinstance(self.parent.positioners[self.axis_1_controller_name], NewportMicrometer):
             current_position = round(self.parent.positioners[self.axis_1_controller_name].read_position(),self.read_precision)
             self.gui.axis_1_set_entry.insert(0, current_position)
             self.set_axis_1()
-        if isinstance(self.parent.positioners[self.axis_2_controller_name], NiDaqPiezoController):
+        if isinstance(self.parent.positioners[self.axis_2_controller_name], NidaqPositionController):
             self.set_axis_2()
         if isinstance(self.parent.positioners[self.axis_2_controller_name], NewportMicrometer):
             current_position = round(self.parent.positioners[self.axis_2_controller_name].read_position(),self.read_precision)
             self.gui.axis_2_set_entry.insert(0, current_position)
             self.set_axis_2()
-        if isinstance(self.parent.positioners[self.axis_3_controller_name], NiDaqPiezoController):
+        if isinstance(self.parent.positioners[self.axis_3_controller_name], NidaqPositionController):
             self.set_axis_3()
         if isinstance(self.parent.positioners[self.axis_3_controller_name], NewportMicrometer):
             current_position = round(self.parent.positioners[self.axis_3_controller_name].read_position(),self.read_precision)
