@@ -52,7 +52,7 @@ QT3Scan:
 
 # Settings for ARS Cryostat
   PositionController:
-    import_path : qdlutils.hardware.nidaq.analogoutputs.nidaqpiezocontroller
+    import_path : qdlutils.hardware.nidaq.nidaqpiezocontroller
     class_name  : QT3ScanNIDAQPositionController
     configure :
       daq_name : Dev1  # NI DAQ Device Name
