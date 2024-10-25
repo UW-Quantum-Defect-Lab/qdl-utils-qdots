@@ -17,7 +17,9 @@ from qdlutils.applications.qdlple.application_gui import (
     MainApplicationView,
     ScanPopoutApplicationView,
 )
+from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
 from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage import NidaqVoltageController
 
 matplotlib.use('Agg')
 
@@ -199,7 +201,11 @@ class MainTkApplication():
         '''
         Stops the scan
         '''
-        self.current_scan.application_controller.stop()
+        logger.info('Requesting to stop scan...')
+        # Let the scanner finish the current scan
+        # it should run application_controller.stop() after it finishes
+        self.current_scan.application_controller.stop_scan = True
+        #self.current_scan.application_controller.stop()
         self.enable_buttons()
 
     def scan_thread_function(self) -> None:
@@ -600,7 +606,7 @@ class ScanPopoutApplication():
             # Get the full image data
             # Maybe can remove if we update image data at the popout window level?
             for reader in self.application_controller.readers:
-                if isinstance(self.application_controller.readers[reader], QT3PleNIDAQEdgeCounterController):
+                if isinstance(self.application_controller.readers[reader], NidaqVoltageController):
                     img_data = np.array([output[reader] for output in self.application_controller.outputs])
             # Write the image data to file
             ds = df.create_dataset('data/scan_counts', data=img_data)

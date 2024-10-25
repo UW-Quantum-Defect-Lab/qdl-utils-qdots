@@ -81,6 +81,9 @@ class NidaqTimedRateCounter(NidaqBatchedRateCounter):
 
         # Update the number of samples per batch
         self.num_data_samples_per_batch = int(self.sample_time_in_seconds * self.clock_rate)
+        # Also need to update the coutner task if it exists
+        if self.edge_counter_interface and self.edge_counter_interface.counter_task:
+            self.edge_counter_interface.counter_task.timing.samp_quant_samp_per_chan = self.num_data_samples_per_batch
 
     def configure_sample_time(self, sample_time: float) -> None:
         '''
@@ -96,3 +99,6 @@ class NidaqTimedRateCounter(NidaqBatchedRateCounter):
         self.sample_time_in_seconds = sample_time
         # Update the number of samples per batch
         self.num_data_samples_per_batch = int(self.sample_time_in_seconds * self.clock_rate)
+        # Also need to update the coutner task if it exists
+        if self.edge_counter_interface and self.edge_counter_interface.counter_task:
+            self.edge_counter_interface.counter_task.timing.samp_quant_samp_per_chan = self.num_data_samples_per_batch

@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tkinter as tk
 
+from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
 from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage import NidaqVoltageController
 
 matplotlib.use('Agg')
 
@@ -212,7 +214,7 @@ class DataViewport:
 
         # Look for the single DAQ reader and get the image data
         for reader in model.readers:
-            if isinstance(model.readers[reader], QT3PleNIDAQEdgeCounterController):
+            if isinstance(model.readers[reader], NidaqTimedRateCounter):
                 img_data = np.array([output[reader] for output in model.outputs])
 
         # Calculate the axis extent

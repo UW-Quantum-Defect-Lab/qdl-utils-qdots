@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 
+from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
 from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
 from qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage import NidaqVoltageController
 
@@ -48,6 +49,7 @@ class PleScanner:
         
         # Control variables for system state
         self.running = False
+        self.stop_scan = False
         self.current_frame = 0
 
         # Scan parameters
@@ -360,6 +362,10 @@ class PleScanner:
         # Log start of upsweep
         logger.info(f'Starting upsweep on scan {self.current_frame+1}.')
 
+        # Configure the DAQ counter for the upsweep
+        for reader in self.readers:
+            if isinstance(self.readers[reader], NidaqTimedRateCounter):
+                self.readers[reader].configure_sample_time(sample_time=self.sample_time_up)
 
         # Scan the upsweep over all sample voltages
         for voltage in self.sample_voltages_up:
@@ -380,7 +386,7 @@ class PleScanner:
                 # Check if reader is the desired class.
                 # Everything in here probably needs to be in a separate thread target
                 # function and additional threads need to be launched for other readers
-                if isinstance(self.readers[reader], QT3PleNIDAQEdgeCounterController):
+                if isinstance(self.readers[reader], NidaqTimedRateCounter):
 
                     # This samples one batch consisting of N clock cycles on the DAQ
                     # where N = self.sample_time_up * clock_frequency (which is set
@@ -390,7 +396,10 @@ class PleScanner:
                     # they are generally very small (< 1 microsecond).
                     # The output counts_at_sample is an array [[counts, N]] where,
                     # again, N is the number of clock cycles per batch.
-                    raw_counts_at_sample = self.readers[reader].sample_counts(1, self.sample_time_up)
+
+                    # New update: get a single batch raw output
+                    # Code currently expects the 2d output so reshape it for now
+                    raw_counts_at_sample = self.readers[reader].sample_batch_raw().reshape(1,2) 
 
                     # Write raw counts to outputs dictionary
                     # The dictionary value at the desired reader will take the form
@@ -401,6 +410,11 @@ class PleScanner:
         logger.info(f'Finished upsweep on scan {self.current_frame+1}')
         logger.info(f'Starting downsweep on scan {self.current_frame+1}')
 
+        # Configure the DAQ counter for the downsweep
+        for reader in self.readers:
+            if isinstance(self.readers[reader], NidaqTimedRateCounter):
+                self.readers[reader].configure_sample_time(sample_time=self.sample_time_down)
+
         # Now scan the voltages down
         for voltage in self.sample_voltages_down:
             # Go to the voltage
@@ -408,8 +422,10 @@ class PleScanner:
             logger.debug(f'Move to voltage: {voltage}')
             # Same as before; must be modified accordingly to handle multiple readers.
             for reader in self.readers:
-                if isinstance(self.readers[reader], QT3PleNIDAQEdgeCounterController):
-                    raw_counts_at_sample = self.readers[reader].sample_counts(1, self.sample_time_down)
+                if isinstance(self.readers[reader], NidaqTimedRateCounter):
+                    # New update: get a single batch raw output
+                    # reshaping for now since output is expected to be weird.
+                    raw_counts_at_sample = self.readers[reader].sample_batch_raw().reshape(1,2) 
                     # Now saving to downsweep dictionary
                     raw_output_at_samples_down[reader].append(raw_counts_at_sample)
 
@@ -425,7 +441,7 @@ class PleScanner:
         for reader in self.readers:
             # Logic for processing each type of reader will depend on the output structure
             # of the corresponding reader. Thus, each type should be implemented separately
-            if isinstance(self.readers[reader], QT3PleNIDAQEdgeCounterController):
+            if isinstance(self.readers[reader], NidaqTimedRateCounter):
 
                 # Remove the extra dimension(s)
                 raw_output_up = np.array(raw_output_at_samples_up[reader]).squeeze()
@@ -453,6 +469,10 @@ class PleScanner:
 
                 # Concatenate the result
                 output[reader] = np.concatenate([counts_per_second_up, counts_per_second_down])
+
+        if self.stop_scan:
+            logger.info('Scan stop acknowledged. Exiting thread.')
+            self.stop()
 
         return output
 

@@ -149,6 +149,11 @@ class NidaqBatchedRateCounter:
                     self.edge_counter_interface.clock_task.close()
                 except Exception as e:
                     logger.debug(e)
+            # Close the counter task
+            try:
+                self.edge_counter_interface.counter_task.close()
+            except Exception as e:
+                logger.debug(e)
         # Update state
         self.running = False
 
@@ -186,8 +191,9 @@ class NidaqBatchedRateCounter:
             logger.debug('Starting counter task')
 
             #Flag the counter task to wait until it finishes and start it
-            self.edge_counter_interface.counter_task.wait_until_done()
+            #self.edge_counter_interface.counter_task.wait_until_done()
             self.edge_counter_interface.counter_task.start()
+            self.edge_counter_interface.counter_task.wait_until_done()
             logger.debug('Reading data')
 
             # Read the samples and load counts into the data_buffer
@@ -416,7 +422,7 @@ class NidaqBatchedRateCounter:
         if self.running is False:
             return np.zeros(1),0
         data_sample, samples_read = self._read_samples()
-        return np.array(np.sum(data_sample), samples_read)
+        return np.array([np.sum(data_sample), samples_read])
 
     def sample_batch_counts(self) -> int:
         '''
@@ -452,7 +458,7 @@ class NidaqBatchedRateCounter:
         if self.running is False:
             return np.zeros(1),0
         data_sample, samples_read = self._read_samples()
-        return np.array(np.sum(data_sample), samples_read/self.clock_rate)
+        return np.array([np.sum(data_sample), samples_read/self.clock_rate])
     
     def sample_batch_rate(self) -> float:
         '''
@@ -470,5 +476,5 @@ class NidaqBatchedRateCounter:
         if self.running is False:
             return np.zeros(1),0
         data_sample, samples_read = self._read_samples()
-        return np.array(np.sum(data_sample), samples_read)
+        return float(np.sum(data_sample) * self.clock_rate /  samples_read)
 
