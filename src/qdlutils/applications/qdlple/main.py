@@ -18,8 +18,6 @@ from qdlutils.applications.qdlple.application_gui import (
     ScanPopoutApplicationView,
 )
 from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
-from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
-from qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage import NidaqVoltageController
 
 matplotlib.use('Agg')
 
@@ -606,7 +604,7 @@ class ScanPopoutApplication():
             # Get the full image data
             # Maybe can remove if we update image data at the popout window level?
             for reader in self.application_controller.readers:
-                if isinstance(self.application_controller.readers[reader], NidaqVoltageController):
+                if isinstance(self.application_controller.readers[reader], NidaqTimedRateCounter):
                     img_data = np.array([output[reader] for output in self.application_controller.outputs])
             # Write the image data to file
             ds = df.create_dataset('data/scan_counts', data=img_data)

@@ -8,8 +8,6 @@ import numpy as np
 import tkinter as tk
 
 from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
-from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
-from qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage import NidaqVoltageController
 
 matplotlib.use('Agg')
 

@@ -4,7 +4,6 @@ import time
 import numpy as np
 
 from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
-from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
 from qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage import NidaqVoltageController
 
 logger = logging.getLogger(__name__)
