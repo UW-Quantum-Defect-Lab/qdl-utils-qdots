@@ -101,6 +101,9 @@ install your fork `my-qdl-utils-fork` (in this example).
 It is assumed that you will use [Anaconda](https://docs.anaconda.com/anaconda/install/)
 or its lightweight version [Miniconda](https://docs.anaconda.com/miniconda/).
 If you are unfamiliar with `conda` please review [this tutorial](https://docs.conda.io/projects/conda/en/latest/user-guide/getting-started.html).
+For Windows users new to Anaconda, it is recommended to install Anaconda for only your user
+and then utilize the provided Anaconda PowerShell Prompt terminal for the remainder
+of this process.
 
 Create a new virtual environment with Python 3.9. In this example we will name the
 virtual environment `qdlutils`, but you can change it to something else if desired.
