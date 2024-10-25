@@ -35,11 +35,24 @@ class NidaqEdgeCounterInterface:
 
     Methods
     -------
+    reset_daq() -> None
+        Resets the current DAQ device.
+
+    configure_di_clock(**kargs) -> None
+        Configures an internal clock task for timing the edge counter events.
+
+    configure_counter_period_measure(**kargs) -> None
+        Configures the counter task for reading data from the coutner.
+
+    create_counter_reader() -> None
+        Creates an `nidaqmx.stream_readers.CounterReader` to read the counts.
 
 
     Notes
     -----
-    To use this class perform the following steps:
+    To use this class perform the following steps to read out data from the counter.
+    In general, it is desirable to wrap this process in another class which has easier
+    to use attributes and configuration (see `NidaqBatchedRateCounter`).
 
         ```
         # Instantiate the edge counter interface
@@ -292,6 +305,6 @@ class NidaqEdgeCounterInterface:
 
     def create_counter_reader(self):
         '''
-        Creates a `nidaqmx.stream_readers.CounterReader to access the counter
+        Creates an `nidaqmx.stream_readers.CounterReader` to access the counter
         '''
         self.counter_reader = nidaqmx.stream_readers.CounterReader(self.counter_task.in_stream)
