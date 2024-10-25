@@ -17,7 +17,7 @@ from qdlutils.applications.qdlple.application_gui import (
     MainApplicationView,
     ScanPopoutApplicationView,
 )
-from qdlutils.hardware.nidaq.counters.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
 
 matplotlib.use('Agg')
 

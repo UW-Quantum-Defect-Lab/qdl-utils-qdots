@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 
-from qdlutils.hardware.nidaq.counters.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
 from qdlutils.hardware.nidaq.analogoutputs.nidaqvoltage import NidaqVoltageController
 
 logger = logging.getLogger(__name__)
@@ -381,7 +381,6 @@ class PleScanner:
                 # Everything in here probably needs to be in a separate thread target
                 # function and additional threads need to be launched for other readers
                 if isinstance(self.readers[reader], QT3PleNIDAQEdgeCounterController):
-                    #self.rate_counters.append(self.readers[reader]) # I don't know what this line does --- doesn't look like it is used at all? Maybe to catch a stop?
 
                     # This samples one batch consisting of N clock cycles on the DAQ
                     # where N = self.sample_time_up * clock_frequency (which is set

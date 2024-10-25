@@ -1,6 +1,6 @@
 QT3Scope:
   DAQController:
-    import_path : qdlutils.hardware.nidaq.counters.nidaqedgecounter
+    import_path : qdlutils.hardware.nidaq.nidaqedgecounter
     class_name  : QT3ScopeNIDAQEdgeCounterController
     configure : 
       daq_name : Dev1  # NI DAQ Device Name

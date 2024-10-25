@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tkinter as tk
 
-from qdlutils.hardware.nidaq.counters.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
+from qdlutils.hardware.nidaq.nidaqedgecounter import QT3PleNIDAQEdgeCounterController
 
 matplotlib.use('Agg')
 
