@@ -19,12 +19,14 @@ class ScanController:
                  x_axis_controller: NidaqPositionController,
                  y_axis_controller: NidaqPositionController,
                  z_axis_controller: NidaqPositionController,
-                 counter_controller: NidaqTimedRateCounter):
+                 counter_controller: NidaqTimedRateCounter,
+                 inter_scan_settle_time: float=0.01):
 
         self.x_axis_controller = x_axis_controller
         self.y_axis_controller = y_axis_controller
         self.z_axis_controller = z_axis_controller
         self.counter_controller = counter_controller
+        self.inter_scan_settle_time = inter_scan_settle_time
 
         # On initialization move all position controllers to zero.
         # WARNING: it is assumed that the zero is a valid position of the DAQ
@@ -90,7 +92,8 @@ class ScanController:
         This avoids logic required to determine which axis is to be moved, for example
         in the case of scans where only one axis is used repeatedly.
         '''
-        # Try to move the axis 
+        logger.debug(f'Attempting to move to position {position}.')
+        # Move the axis 
         axis_controller.go_to_position(position=position)
     
     def scan_axis(self, 
@@ -110,6 +113,9 @@ class ScanController:
             raise RuntimeError('Application controller is currently in use.')
         # Block the controller from additional external commands
         self.busy=True
+        # Start the counter
+        logger.info('Starting counter task on DAQ.')
+        self.counter_controller.start()
         
         # Get the axis controller depending on which axis is requested
         if axis == 'x':
@@ -129,6 +135,7 @@ class ScanController:
         
         # Free up the controller
         self.busy = False
+        self.stop()
         return data
 
 
@@ -205,7 +212,17 @@ class ScanController:
             raise RuntimeError('Application controller is currently in use.')
         # Reserve the controller
         self.busy = True
+        
 
+        # Get the axis controller depending on which axis is requested
+        if axis_1 == 'x':
+            axis_controller_1 = self.x_axis_controller
+        elif axis_1 == 'y':
+            axis_controller_1 = self.y_axis_controller
+        elif axis_1 == 'z':
+            axis_controller_1 = self.z_axis_controller
+        else:
+            raise ValueError(f'Requested axis_1 {axis_1} is invalid.')
         # Get the axis controller depending on which axis is requested
         if axis_2 == 'x':
             axis_controller_2 = self.x_axis_controller
@@ -216,6 +233,10 @@ class ScanController:
         else:
             raise ValueError(f'Requested axis_2 {axis_2} is invalid.')
         
+        # Start the counter
+        logger.info('Starting counter task on DAQ.')
+        self.counter_controller.start()
+
         # Get the positions for the slow scan axis
         positions_2 = np.linspace(start=start_2, stop=stop_2, num=n_pixels_2)
 
@@ -223,12 +244,14 @@ class ScanController:
         for index, position in enumerate(positions_2):
             # Move axis 2 to the desired position
             self._set_axis(axis_controller=axis_controller_2, position=position)
+            # Let the axis settle before next scan
+            time.sleep(self.inter_scan_settle_time)
             # Scan axis 1
-            single_scan =  self.scan_axis(axis=axis_1,
-                                          start=stop_1,
-                                          stop=stop_1,
-                                          n_pixels=n_pixels_1, 
-                                          scan_time=scan_time)
+            single_scan =  self._scan_axis(axis_controller=axis_controller_1,
+                                           start=start_1,
+                                           stop=stop_1,
+                                           n_pixels=n_pixels_1, 
+                                           scan_time=scan_time)
             # Update the buffer
             #output[index] = single_scan
 
