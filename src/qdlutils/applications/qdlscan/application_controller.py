@@ -33,9 +33,9 @@ class ScanController:
         try:
             # Set the positions to zero on start up, this is necessary as it establishes
             # a `last_write_value` for the controllers so that the position is defined.
-            self._set_axis(self, axis_controller=self.x_axis_controller, position=0)
-            self._set_axis(self, axis_controller=self.y_axis_controller, position=0)
-            self._set_axis(self, axis_controller=self.z_axis_controller, position=0)
+            self._set_axis(axis_controller=self.x_axis_controller, position=0)
+            self._set_axis(axis_controller=self.y_axis_controller, position=0)
+            self._set_axis(axis_controller=self.z_axis_controller, position=0)
         except Exception as e:
             logger.warning(f'Could not zero axes on startup: {e}')
 
@@ -142,7 +142,6 @@ class ScanController:
                                scan_time=scan_time)
         
         # Free up the controller
-        self.busy = False
         self.stop()
         return data
 

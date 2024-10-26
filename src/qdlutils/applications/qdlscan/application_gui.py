@@ -151,4 +151,16 @@ class ControlPanel:
         self.hardware_config_from_yaml_button.grid(row=row, column=0, columnspan=1, pady=5)
 
 
+class LineScanApplicationView:
+
+    def __init__(self):
+        self.data_viewport = LineScanDataViewport
+
+class LineScanDataViewport:
+
+    def __init__(self):
+        pass
+
+    def update():
+        pass
 
