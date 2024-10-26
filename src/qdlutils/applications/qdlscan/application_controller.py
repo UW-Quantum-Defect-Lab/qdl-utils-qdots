@@ -31,18 +31,19 @@ class ScanController:
         # On initialization move all position controllers to zero.
         # WARNING: it is assumed that the zero is a valid position of the DAQ
         try:
-            # Set the positions to zero
-            pass
+            # Set the positions to zero on start up, this is necessary as it establishes
+            # a `last_write_value` for the controllers so that the position is defined.
+            self._set_axis(self, axis_controller=self.x_axis_controller, position=0)
+            self._set_axis(self, axis_controller=self.y_axis_controller, position=0)
+            self._set_axis(self, axis_controller=self.z_axis_controller, position=0)
         except Exception as e:
-            logger.warning(f'Could not set axes to zero: {e}')
+            logger.warning(f'Could not zero axes on startup: {e}')
 
 
         # This is a flag to keep track of if the controller is currently busy
         # Must turn on whenever a scan is being performed and remain on until
         # the scanner is free to perform another operation.
         # The external applications are required to flag this when in use.
-
-        # TODO: Logic here is probably not right....
         self.busy = False
         
         # This is a flag to keep track of if a scan is currently in progress
@@ -54,6 +55,15 @@ class ScanController:
         # This is a flag set by external applications to request the application
         # controller to stop scanning.
         self.stop_scan = False
+
+    def get_position(self):
+        '''
+        Returns the position based off of the last write values of the controllers
+        '''
+        x = self.x_axis_controller.last_write_value
+        y = self.y_axis_controller.last_write_value
+        z = self.z_axis_controller.last_write_value
+        return x,y,z
 
     def set_axis(self, axis: str, position: float):
         '''
@@ -83,8 +93,6 @@ class ScanController:
             logger.warning(f'Movement of axis {axis} failed due to exception: {e}')
         # Free up the controller
         self.busy = False
-        
-        
 
     def _set_axis(self, axis_controller: NidaqPositionController, position: float):
         '''
@@ -137,7 +145,6 @@ class ScanController:
         self.busy = False
         self.stop()
         return data
-
 
     def _scan_axis(self, 
                    axis_controller: str,
