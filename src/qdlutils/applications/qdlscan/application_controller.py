@@ -264,13 +264,14 @@ class ScanController:
             # Yield a single scan
             yield single_scan
 
-            # If the stop is requested then terminate
+            # If the stop is requested then terminate and return the final scan
             if self.stop_scan:
                 logger.info('Stopping scan.')
                 self.stop()
-
-        self.busy = False
-
+                return single_scan
+            
+        logger.info('Scan complete.')
+        self.stop()
 
     def stop(self) -> None:
         '''

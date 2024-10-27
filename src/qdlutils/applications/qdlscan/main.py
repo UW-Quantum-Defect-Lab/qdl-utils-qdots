@@ -3,14 +3,13 @@ import importlib.resources
 import logging
 import numpy as np
 import datetime
+import h5py
 
 from threading import Thread
 import tkinter as tk
 import yaml
 
-from qdlutils.hardware.nidaq.analogoutputs.nidaqposition import NidaqPositionController
-from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
-
+import qdlutils
 from qdlutils.applications.qdlscan.application_controller import ScanController
 from qdlutils.applications.qdlscan.application_gui import (
     LauncherApplicationView,
@@ -59,8 +58,13 @@ class LauncherApplication():
         self.number_scans = 0
         # Most recent scan -- maybe not needed?
         self.current_scan = None
-        # Dictionary of scan parameters
+        # Dictionary of scan parameters (from control gui)
         self.scan_parameters = None
+        # Dictionary of daq parameters (from control gui)
+        self.daq_parameters = None
+
+        # Last save directory
+        self.last_save_directory = None
 
         # Load the YAML file based off of `controller_name`
         self.load_yaml_from_name(yaml_filename=default_config_filename)
@@ -75,6 +79,10 @@ class LauncherApplication():
         self.view.control_panel.line_start_x_button.bind("<Button>", self.optimize_x_axis)
         self.view.control_panel.line_start_y_button.bind("<Button>", self.optimize_y_axis)
         self.view.control_panel.line_start_z_button.bind("<Button>", self.optimize_z_axis)
+        self.view.control_panel.x_axis_set_button.bind("<Button>", self.set_x_axis)
+        self.view.control_panel.y_axis_set_button.bind("<Button>", self.set_y_axis)
+        self.view.control_panel.z_axis_set_button.bind("<Button>", self.set_z_axis)
+        self.view.control_panel.get_position_button.bind("<Button>", self.get_coordinates)
 
     def run(self) -> None:
         '''
@@ -213,7 +221,7 @@ class LauncherApplication():
             range = self.scan_parameters['line_range_xy'],
             n_pixels = self.scan_parameters['line_pixels'],
             time = self.scan_parameters['line_time'],
-            id = self.number_scans
+            id = str(self.number_scans).zfill(3)
         )
 
     def optimize_y_axis(self, tkinter_event=None):
@@ -237,7 +245,7 @@ class LauncherApplication():
             range = self.scan_parameters['line_range_xy'],
             n_pixels = self.scan_parameters['line_pixels'],
             time = self.scan_parameters['line_time'],
-            id = self.number_scans
+            id = str(self.number_scans).zfill(3)
         )
 
     def optimize_z_axis(self, tkinter_event=None):
@@ -261,7 +269,7 @@ class LauncherApplication():
             range = self.scan_parameters['line_range_z'],
             n_pixels = self.scan_parameters['line_pixels'],
             time = self.scan_parameters['line_time'],
-            id = self.number_scans
+            id = str(self.number_scans).zfill(3)
         )
 
     def start_image_scan(self, tkinter_event=None):
@@ -286,9 +294,46 @@ class LauncherApplication():
             range = self.scan_parameters['image_range'],
             n_pixels = self.scan_parameters['image_pixels'],
             time = self.scan_parameters['image_time'],
-            id = self.number_scans
+            id = str(self.number_scans).zfill(3)
         )
     
+    def set_x_axis(self, tkinter_event=None):
+        try:
+            self._get_daq_config()
+            position = self.daq_parameters['x_position']
+            self.application_controller.set_axis(axis='x', position=position)
+            logger.info(f'Set x axis to {position}')
+        except Exception as e:
+            logger.error(f'Error with setting x axis: {e}')
+
+    def set_y_axis(self, tkinter_event=None):
+        try:
+            self._get_daq_config()
+            position = self.daq_parameters['y_position']
+            self.application_controller.set_axis(axis='y', position=position)
+            logger.info(f'Set y axis to {position}')
+        except Exception as e:
+            logger.error(f'Error with setting y axis: {e}')
+        
+    def set_z_axis(self, tkinter_event=None):
+        try:
+            self._get_daq_config()
+            position = self.daq_parameters['z_position']
+            self.application_controller.set_axis(axis='z', position=position)
+            logger.info(f'Set z axis to {position}')
+        except Exception as e:
+            logger.error(f'Error with setting z axis: {e}')
+        
+    def get_coordinates(self, tkinter_event=None):
+        
+        x,y,z = self.application_controller.get_position()
+        self.view.control_panel.x_axis_set_entry.delete(0, 'end')
+        self.view.control_panel.y_axis_set_entry.delete(0, 'end')
+        self.view.control_panel.z_axis_set_entry.delete(0, 'end')
+        self.view.control_panel.x_axis_set_entry.insert(0, x)
+        self.view.control_panel.y_axis_set_entry.insert(0, y)
+        self.view.control_panel.z_axis_set_entry.insert(0, z)
+
     def _get_scan_config(self) -> dict:
         '''
         Get the values in the GUI validate if they are allowable
@@ -355,6 +400,26 @@ class LauncherApplication():
             'line_time': line_time,
         }
 
+    def _get_daq_config(self):
+
+        x_position = float(self.view.control_panel.x_axis_set_entry.get())
+        y_position = float(self.view.control_panel.y_axis_set_entry.get())
+        z_position = float(self.view.control_panel.z_axis_set_entry.get())
+
+        if (x_position < self.min_x_position) or (x_position > self.max_x_position):
+            raise ValueError(f'Requested x coordinate {x_position} is out of bounds.')
+        if (y_position < self.min_y_position) or (y_position > self.max_y_position):
+            raise ValueError(f'Requested y coordinate {y_position} is out of bounds.')
+        if (z_position < self.min_z_position) or (z_position > self.max_z_position):
+            raise ValueError(f'Requested z coordinate {z_position} is out of bounds.')
+
+        # Write to application memory
+        self.daq_parameters = {
+            'x_position': x_position,
+            'y_position': y_position,
+            'z_position': z_position
+        }
+
 
 class LineScanApplication:
     '''
@@ -401,7 +466,6 @@ class LineScanApplication:
         # Get the starting position
         self.start_position_vector = application_controller.get_position()
         self.start_position_axis = self.start_position_vector[AXIS_INDEX[axis]]
-        self.final_position_vector = None
         self.final_position_axis = None
         # Get the limits of the scan
         self.min_position = self.start_position_axis - (range/2)
@@ -409,16 +473,18 @@ class LineScanApplication:
         # Check if the limits exceed the range and shift range to edge
         if self.min_position < min_allowed_position:
             # Too close to minimum edge, need to shift up
+            logger.warning('Start position too close to edge, shifting.')
             shift = min_allowed_position - self.min_position
             self.min_position += shift
             self.max_position += shift
-            self.start_position_axis += shift
+            #self.start_position_axis += shift
         if self.max_position > max_allowed_position:
             # Too close to minimum edge, need to shift up
+            logger.warning('Start position too close to edge, shifting.')
             shift = max_allowed_position - self.max_position
             self.min_position += shift
             self.max_position += shift
-            self.start_position_axis += shift
+            #self.start_position_axis += shift
         # Get the scan positions (along whatever axis is being scanned)
         # We're brute forcing it here as the application controller might not sample
         # positions in the exact same way...
@@ -437,7 +503,10 @@ class LineScanApplication:
                                             application=self,
                                             settings_dict=parent_application.scan_parameters)
 
-        # Start the scan thread
+        # Bind the buttons
+        self.view.control_panel.save_button.bind("<Button>", self.save_scan)
+
+
         # Launch the thread
         self.scan_thread = Thread(target=self.scan_thread_function)
         self.scan_thread.start()
@@ -460,10 +529,6 @@ class LineScanApplication:
             self.optimize_position()
             # Update the viewport
             self.view.update_figure()
-            
-            # DEBUG ============================
-            print(self.data_y)
-            # DEBUG ============================
 
             logger.info('Scan complete.')
         except Exception as e:
@@ -482,6 +547,107 @@ class LineScanApplication:
 
         # Move to optmial position
         self.application_controller.set_axis(axis=self.axis, position=self.final_position_axis)
+
+    def save_scan(self, tkinter_event=None):
+        '''
+        Method to save the data, you can add more logic later for other filetypes.
+        The event input is to catch the tkinter event that is supplied but not used.
+        '''
+        allowed_formats = [('Image with dataset', '*.png'), ('Dataset', '*.hdf5')]
+
+        # Default filename
+        default_name = f'scan{self.id}_{self.timestamp.strftime("%Y%m%d")}'
+            
+        # Get the savefile name
+        afile = tk.filedialog.asksaveasfilename(filetypes=allowed_formats, 
+                                                initialfile=default_name+'.png',
+                                                initialdir = self.parent_application.last_save_directory)
+        # Handle if file was not chosen
+        if afile is None or afile == '':
+            logger.warning('File not saved!')
+            return # selection was canceled.
+
+        # Get the path
+        file_path = '/'.join(afile.split('/')[:-1])  + '/'
+        self.parent_application.last_save_directory = file_path # Save the last used file path
+        logger.info(f'Saving files to directory: {file_path}')
+        # Get the name with extension (will be overwritten)
+        file_name = afile.split('/')[-1]
+        # Get the filetype
+        file_type = file_name.split('.')[-1]
+        # Get the filename without extension
+        file_name = '.'.join(file_name.split('.')[:-1]) # Gets everything but the extension
+
+        # If the file type is .png, want to save image and hdf5
+        if file_type == 'png':
+            logger.info(f'Saving the PNG as {file_name}.png')
+            fig = self.view.data_viewport.fig
+            fig.savefig(file_path+file_name+'.png', dpi=300, bbox_inches=None, pad_inches=0)
+
+        # Save as hdf5
+        with h5py.File(file_path+file_name+'.hdf5', 'w') as df:
+            
+            logger.info(f'Saving the HDF5 as {file_name}.hdf5')
+            
+            # Save the file metadata
+            ds = df.create_dataset('file_metadata', 
+                                   data=np.array(['application', 
+                                                  'qdlutils_version', 
+                                                  'scan_id', 
+                                                  'timestamp', 
+                                                  'original_name'], dtype='S'))
+            ds.attrs['application'] = 'qdlutils.qdlscan.LineScanApplication'
+            ds.attrs['qdlutils_version'] = qdlutils.__version__
+            ds.attrs['scan_id'] = self.id
+            ds.attrs['timestamp'] = self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            ds.attrs['original_name'] = file_name
+
+            # Save the scan settings
+            # If your implementation settings vary you should change the attrs
+            ds = df.create_dataset('scan_settings/axis', data=self.axis)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Axis of the scan.'
+            ds = df.create_dataset('scan_settings/range', data=self.range)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Length of the scan.'
+            ds = df.create_dataset('scan_settings/n_pixels', data=self.n_pixels)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Number of pixels in the scan.'
+            ds = df.create_dataset('scan_settings/time', data=self.time)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Length of time for the scan.'
+            ds = df.create_dataset('scan_settings/time_per_pixel', data=self.time_per_pixel)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Time integrated per pixel.'
+
+            ds = df.create_dataset('scan_settings/start_position_vector', data=self.start_position_vector)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Intial position of the scan.'
+            ds = df.create_dataset('scan_settings/start_position_axis', data=self.start_position_axis)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Initial position on the scan axis.'
+            ds = df.create_dataset('scan_settings/final_position_axis', data=self.final_position_axis)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Final position on the scan axis.'
+            ds = df.create_dataset('scan_settings/min_position', data=self.min_position)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Minimum axis position of the scan.'
+            ds = df.create_dataset('scan_settings/max_position', data=self.max_position)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Maximum axis position of the scan.'
+
+            # Data
+            ds = df.create_dataset('data/positions', data=self.data_x)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Positions of the scan (along axis).'
+            ds = df.create_dataset('data/count_rates', data=self.data_y)
+            ds.attrs['units'] = 'Counts per second'
+            ds.attrs['description'] = 'Count rates measured over scan.'
+            ds = df.create_dataset('data/counts', data=(self.data_y*self.time_per_pixel).astype(int))
+            ds.attrs['units'] = 'Counts'
+            ds.attrs['description'] = 'Counts measured over scan.'
+
+
 
 
 class ImageScanApplication():
@@ -599,16 +765,153 @@ class ImageScanApplication():
         self.view = ImageScanApplicationView(window=self.root, 
                                             application=self,
                                             settings_dict=parent_application.scan_parameters)
+        
+        # Bind the buttons
+        self.view.control_panel.pause_button.bind("<Button>", self.pause_scan)
+        self.view.control_panel.continue_button.bind("<Button>", self.continue_scan)
+        self.view.control_panel.save_button.bind("<Button>", self.save_scan)
 
         # Launch the thread
         self.scan_thread = Thread(target=self.start_scan_thread_function)
         self.scan_thread.start()
 
-    def continue_scan(self):
-        # Start the scan thread
-        # Launch the thread
+    def continue_scan(self, tkinter_event=None):
+        # Don't do anything if busy
+        if self.application_controller.busy:
+            logger.error('Controller is busy; cannot continue scan.')
+        if self.current_scan_index == self.n_pixels:
+            logger.error('Scan already completed.')
+            return None
+        # Start the scan thread to continue
         self.scan_thread = Thread(target=self.continue_scan_thread_function)
         self.scan_thread.start()
+    
+    def pause_scan(self, tkinter_event=None):
+        '''
+        Tell the scanner to pause scanning
+        '''
+        if self.application_controller.stop_scan is True:
+            logger.info('Already waiting to pause.')
+            return None
+        if self.current_scan_index == self.n_pixels:
+            logger.error('Scan already completed.')
+            return None
+
+        if self.application_controller.busy:
+            logger.info('Pausing the scan...')
+            # Query the controller to stop
+            self.application_controller.stop_scan = True
+
+    def save_scan(self, tkinter_event=None):
+        '''
+        Method to save the data, you can add more logic later for other filetypes.
+        The event input is to catch the tkinter event that is supplied but not used.
+        '''
+        allowed_formats = [('Image with dataset', '*.png'), ('Dataset', '*.hdf5')]
+
+        # Default filename
+        default_name = f'scan{self.id}_{self.timestamp.strftime("%Y%m%d")}'
+            
+        # Get the savefile name
+        afile = tk.filedialog.asksaveasfilename(filetypes=allowed_formats, 
+                                                initialfile=default_name+'.png',
+                                                initialdir = self.parent_application.last_save_directory)
+        # Handle if file was not chosen
+        if afile is None or afile == '':
+            logger.warning('File not saved!')
+            return # selection was canceled.
+
+        # Get the path
+        file_path = '/'.join(afile.split('/')[:-1])  + '/'
+        self.parent_application.last_save_directory = file_path # Save the last used file path
+        logger.info(f'Saving files to directory: {file_path}')
+        # Get the name with extension (will be overwritten)
+        file_name = afile.split('/')[-1]
+        # Get the filetype
+        file_type = file_name.split('.')[-1]
+        # Get the filename without extension
+        file_name = '.'.join(file_name.split('.')[:-1]) # Gets everything but the extension
+
+        # If the file type is .png, want to save image and hdf5
+        if file_type == 'png':
+            logger.info(f'Saving the PNG as {file_name}.png')
+            fig = self.view.data_viewport.fig
+            fig.savefig(file_path+file_name+'.png', dpi=300, bbox_inches=None, pad_inches=0)
+
+        # Save as hdf5
+        with h5py.File(file_path+file_name+'.hdf5', 'w') as df:
+            
+            logger.info(f'Saving the HDF5 as {file_name}.hdf5')
+            
+            # Save the file metadata
+            ds = df.create_dataset('file_metadata', 
+                                   data=np.array(['application', 
+                                                  'qdlutils_version', 
+                                                  'scan_id', 
+                                                  'timestamp', 
+                                                  'original_name'], dtype='S'))
+            ds.attrs['application'] = 'qdlutils.qdlscan.ImageScanApplication'
+            ds.attrs['qdlutils_version'] = qdlutils.__version__
+            ds.attrs['scan_id'] = self.id
+            ds.attrs['timestamp'] = self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            ds.attrs['original_name'] = file_name
+
+            # Save the scan settings
+            # If your implementation settings vary you should change the attrs
+            ds = df.create_dataset('scan_settings/axis_1', data=self.axis_1)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'First axis of the scan (which is scanned quickly).'
+            ds = df.create_dataset('scan_settings/axis_2', data=self.axis_2)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Second axis of the scan (which is scanned slowly).'
+            ds = df.create_dataset('scan_settings/range', data=self.range)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Length of the scan.'
+            ds = df.create_dataset('scan_settings/n_pixels', data=self.n_pixels)
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Number of pixels in the scan.'
+            ds = df.create_dataset('scan_settings/time', data=self.time)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Length of time for the scan along axis 1.'
+            ds = df.create_dataset('scan_settings/time_per_pixel', data=self.time_per_pixel)
+            ds.attrs['units'] = 'Seconds'
+            ds.attrs['description'] = 'Time integrated per pixel.'
+
+            ds = df.create_dataset('scan_settings/start_position_vector', data=self.start_position_vector)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Intial position of the scan.'
+            ds = df.create_dataset('scan_settings/start_position_axis_1', data=self.start_position_axis_1)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Initial position on the scan axis 1.'
+            ds = df.create_dataset('scan_settings/start_position_axis_2', data=self.start_position_axis_2)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Initial position on the scan axis 2.'
+            ds = df.create_dataset('scan_settings/min_position_1', data=self.min_position_1)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Minimum axis 1 position of the scan.'
+            ds = df.create_dataset('scan_settings/min_position_2', data=self.min_position_2)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Minimum axis 2 position of the scan.'
+            ds = df.create_dataset('scan_settings/max_position_1', data=self.max_position_1)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Maximum axis 1 position of the scan.'
+            ds = df.create_dataset('scan_settings/max_position_2', data=self.max_position_2)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Maximum axis 2 position of the scan.'
+
+            # Data
+            ds = df.create_dataset('data/positions_axis_1', data=self.data_x)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Positions of the scan (along axis 1).'
+            ds = df.create_dataset('data/positions_axis_2', data=self.data_y)
+            ds.attrs['units'] = 'Micrometers'
+            ds.attrs['description'] = 'Positions of the scan (along axis 2).'
+            ds = df.create_dataset('data/count_rates', data=self.data_z)
+            ds.attrs['units'] = 'Counts per second'
+            ds.attrs['description'] = 'Count rates measured over 2-d scan.'
+            ds = df.create_dataset('data/counts', data=(self.data_z*self.time_per_pixel).astype(int))
+            ds.attrs['units'] = 'Counts'
+            ds.attrs['description'] = 'Counts measured over 2-d scan.'
 
     def start_scan_thread_function(self):
         '''
@@ -633,9 +936,7 @@ class ImageScanApplication():
                 # Increase the current scan index
                 self.current_scan_index += 1
 
-                # DEBUG ============================
-                print(line)
-                # DEBUG ============================
+                logger.debug('Row complete.')
 
             self.home_position()
             logger.info('Scan complete.')
@@ -670,9 +971,7 @@ class ImageScanApplication():
                 # Increase the current scan index
                 self.current_scan_index += 1
 
-                # DEBUG ============================
-                print(line)
-                # DEBUG ============================
+                logger.debug('Row complete.')
 
             self.home_position()
             logger.info('Scan complete.')

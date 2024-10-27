@@ -4,10 +4,7 @@ import matplotlib
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import matplotlib.pyplot as plt
 
-import numpy as np
 import tkinter as tk
-
-#from qdlutils.applications.qdlscan.main import LineScanApplication
 
 matplotlib.use('Agg')
 
@@ -47,19 +44,19 @@ class LauncherControlPanel:
         row += 1
         tk.Label(scan_frame, text='Range (μm)').grid(row=row, column=0, padx=5, pady=2)
         self.image_range_entry = tk.Entry(scan_frame, width=10)
-        self.image_range_entry.insert(10, 80)
+        self.image_range_entry.insert(0, 80)
         self.image_range_entry.grid(row=row, column=1, padx=5, pady=2)
         # Number of pixels
         row += 1
         tk.Label(scan_frame, text='Number of pixels').grid(row=row, column=0, padx=5, pady=2)
         self.image_pixels_entry = tk.Entry(scan_frame, width=10)
-        self.image_pixels_entry.insert(10, 80)
+        self.image_pixels_entry.insert(0, 80)
         self.image_pixels_entry.grid(row=row, column=1, padx=5, pady=2)
         # Scan speed
         row += 1
         tk.Label(scan_frame, text='Time per row (s)').grid(row=row, column=0, padx=5, pady=2)
         self.image_time_entry = tk.Entry(scan_frame, width=10)
-        self.image_time_entry.insert(10, 1)
+        self.image_time_entry.insert(0, 1)
         self.image_time_entry.grid(row=row, column=1, padx=5, pady=2)
         # Start button
         row += 1
@@ -75,25 +72,25 @@ class LauncherControlPanel:
         row += 1
         tk.Label(scan_frame, text='Range XY (μm)').grid(row=row, column=0, padx=5, pady=2)
         self.line_range_xy_entry = tk.Entry(scan_frame, width=10)
-        self.line_range_xy_entry.insert(10, 3)
+        self.line_range_xy_entry.insert(0, 3)
         self.line_range_xy_entry.grid(row=row, column=1, padx=5, pady=2)
         # Number of pixels
         row += 1
         tk.Label(scan_frame, text='Range Z (μm)').grid(row=row, column=0, padx=5, pady=2)
         self.line_range_z_entry = tk.Entry(scan_frame, width=10)
-        self.line_range_z_entry.insert(10, 20)
+        self.line_range_z_entry.insert(0, 20)
         self.line_range_z_entry.grid(row=row, column=1, padx=5, pady=2)
         # Number of pixels
         row += 1
         tk.Label(scan_frame, text='Number of pixels').grid(row=row, column=0, padx=5, pady=2)
         self.line_pixels_entry = tk.Entry(scan_frame, width=10)
-        self.line_pixels_entry.insert(10, 50)
+        self.line_pixels_entry.insert(0, 50)
         self.line_pixels_entry.grid(row=row, column=1, padx=5, pady=2)
         # Scan speed
         row += 1
         tk.Label(scan_frame, text='Time (s)').grid(row=row, column=0, padx=5, pady=2)
         self.line_time_entry = tk.Entry(scan_frame, width=10)
-        self.line_time_entry.insert(10, 1)
+        self.line_time_entry.insert(0, 1)
         self.line_time_entry.grid(row=row, column=1, padx=5, pady=2)
         # Start buttons
         row += 1
@@ -119,26 +116,31 @@ class LauncherControlPanel:
         self.x_axis_set_button = tk.Button(daq_frame, text='Set X (μm)', width=10)
         self.x_axis_set_button.grid(row=row, column=0, columnspan=1, padx=5, pady=[5,1])
         self.x_axis_set_entry = tk.Entry(daq_frame, width=10)
-        self.x_axis_set_entry.insert(10, 0)
+        self.x_axis_set_entry.insert(0, 0)
         self.x_axis_set_entry.grid(row=row, column=1, padx=5, pady=[5,1])
         # Y axis
         row += 1
         self.y_axis_set_button = tk.Button(daq_frame, text='Set Y (μm)', width=10)
         self.y_axis_set_button.grid(row=row, column=0, columnspan=1, padx=5, pady=1)
         self.y_axis_set_entry = tk.Entry(daq_frame, width=10)
-        self.y_axis_set_entry.insert(10, 0)
+        self.y_axis_set_entry.insert(0, 0)
         self.y_axis_set_entry.grid(row=row, column=1, padx=5, pady=1)
         # Z axis
         row += 1
         self.z_axis_set_button = tk.Button(daq_frame, text='Set Z (μm)', width=10)
         self.z_axis_set_button.grid(row=row, column=0, columnspan=1, padx=5, pady=[1,5])
         self.z_axis_set_entry = tk.Entry(daq_frame, width=10)
-        self.z_axis_set_entry.insert(10, 0)
+        self.z_axis_set_entry.insert(0, 0)
         self.z_axis_set_entry.grid(row=row, column=1, padx=5, pady=1)
         # Get button
         row += 1
         self.get_position_button = tk.Button(daq_frame, text='Get current position', width=20)
         self.get_position_button.grid(row=row, column=0, columnspan=2, pady=[1,5])
+
+        ''' I do not think that we need to implement this since most people will not
+            change settings dynamically. But, it can be added back in by uncommenting
+            this section and defining the proper callback function and binding it
+            in main.py
 
         # Define frame for DAQ and control
         config_frame = tk.Frame(main_frame)
@@ -149,6 +151,7 @@ class LauncherControlPanel:
         row += 1
         self.hardware_config_from_yaml_button = tk.Button(config_frame, text="Load YAML Config")
         self.hardware_config_from_yaml_button.grid(row=row, column=0, columnspan=1, pady=5)
+        '''
 
 
 class LineScanApplicationView:
@@ -215,7 +218,7 @@ class LineScanApplicationView:
         self.data_viewport.ax.set_ylim(y_axis_limits)
 
         self.data_viewport.ax.set_xlabel(f'{self.application.axis} position (μm)', fontsize=14)
-        self.data_viewport.ax.set_ylabel(f'Intensity (counts/second)', fontsize=14)
+        self.data_viewport.ax.set_ylabel(f'Intensity (cts/s)', fontsize=14)
         self.data_viewport.ax.grid(alpha=0.3)
 
         self.data_viewport.canvas.draw()
