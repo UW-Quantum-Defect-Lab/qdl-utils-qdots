@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tkinter as tk
 
-from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
+#from qdlutils.applications.qdlscan.main import LineScanApplication
 
 matplotlib.use('Agg')
 
@@ -24,9 +24,9 @@ class LauncherApplicationView:
         main_frame = tk.Frame(main_window)
         main_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=40, pady=30)
 
-        self.control_panel = ControlPanel(main_frame)
+        self.control_panel = LauncherControlPanel(main_frame)
 
-class ControlPanel:
+class LauncherControlPanel:
 
     def __init__(self, main_frame: tk.Frame):
 
@@ -87,7 +87,7 @@ class ControlPanel:
         row += 1
         tk.Label(scan_frame, text='Number of pixels').grid(row=row, column=0, padx=5, pady=2)
         self.line_pixels_entry = tk.Entry(scan_frame, width=10)
-        self.line_pixels_entry.insert(10, 80)
+        self.line_pixels_entry.insert(10, 50)
         self.line_pixels_entry.grid(row=row, column=1, padx=5, pady=2)
         # Scan speed
         row += 1
@@ -153,14 +153,279 @@ class ControlPanel:
 
 class LineScanApplicationView:
 
-    def __init__(self):
-        self.data_viewport = LineScanDataViewport
+    def __init__(self, 
+                 window: tk.Toplevel, 
+                 application,   # LineScanApplication
+                 settings_dict: dict):
+        
+        self.application = application
+        self.settings_dict = settings_dict
 
-class LineScanDataViewport:
+        self.data_viewport = LineDataViewport(window=window)
+        self.control_panel = LineFigureControlPanel(window=window, settings_dict=settings_dict)
 
-    def __init__(self):
-        pass
+        # Initalize the figure
+        self.initialize_figure()
 
-    def update():
-        pass
+    def initialize_figure(self) -> None:
+        # Clear the axis
+        self.data_viewport.ax.clear()
 
+        # Get the y_axis limits to draw the position lines
+        y_axis_limits = self.data_viewport.ax.get_ylim()
+        self.data_viewport.ax.plot([self.application.start_position_axis,]*2, 
+                                   y_axis_limits,
+                                   color='#bac8ff',
+                                   linewidth=1.5)
+        
+        self.data_viewport.ax.set_xlim(self.application.min_position, self.application.max_position)
+        self.data_viewport.ax.set_ylim(y_axis_limits)
+
+        self.data_viewport.ax.set_xlabel(f'{self.application.axis} position (μm)', fontsize=14)
+        self.data_viewport.ax.set_ylabel(f'Intensity (counts/second)', fontsize=14)
+        self.data_viewport.ax.grid(alpha=0.3)
+
+        self.data_viewport.canvas.draw()
+
+    def update_figure(self) -> None:
+        '''
+        Update the figure
+        '''
+        # Clear the axis
+        self.data_viewport.ax.clear()
+
+        # Plot the data line
+        self.data_viewport.ax.plot(self.application.data_x, 
+                                   self.application.data_y,
+                                   color='k',
+                                   linewidth=1.5)
+        
+        # Get the y_axis limits to draw the position lines
+        y_axis_limits = self.data_viewport.ax.get_ylim()
+        self.data_viewport.ax.plot([self.application.start_position_axis,]*2, 
+                                   y_axis_limits,
+                                   color='#bac8ff',
+                                   linewidth=1.5)
+        self.data_viewport.ax.plot([self.application.final_position_axis,]*2, 
+                                   y_axis_limits,
+                                   color='#1864ab',
+                                   linewidth=1.5)
+        
+        self.data_viewport.ax.set_xlim(self.application.min_position, self.application.max_position)
+        self.data_viewport.ax.set_ylim(y_axis_limits)
+
+        self.data_viewport.ax.set_xlabel(f'{self.application.axis} position (μm)', fontsize=14)
+        self.data_viewport.ax.set_ylabel(f'Intensity (counts/second)', fontsize=14)
+        self.data_viewport.ax.grid(alpha=0.3)
+
+        self.data_viewport.canvas.draw()
+
+
+class LineDataViewport:
+
+    def __init__(self, window):
+
+        # Parent frame for control panel
+        frame = tk.Frame(window)
+        frame.pack(side=tk.LEFT, padx=0, pady=0)
+
+        self.fig = plt.figure()
+        self.ax = plt.gca()
+        self.canvas = FigureCanvasTkAgg(self.fig, master=frame)
+        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        toolbar = NavigationToolbar2Tk(self.canvas, frame)
+        toolbar.update()
+        self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self.canvas.draw()
+
+
+class LineFigureControlPanel:
+
+    def __init__(self, window: tk.Toplevel, settings_dict: dict):
+
+        # Parent frame for control panel
+        frame = tk.Frame(window)
+        frame.pack(side=tk.TOP, padx=30, pady=20)
+
+        # Frame for saving/modifying data viewport
+        command_frame = tk.Frame(frame)
+        command_frame.pack(side=tk.TOP, padx=0, pady=0)
+        # Add buttons and text
+        row = 0
+        tk.Label(command_frame, 
+                 text='Scan control', 
+                 font='Helvetica 14').grid(row=row, column=0, pady=[0,5], columnspan=2)
+        # Save button
+        row += 1
+        self.save_button = tk.Button(command_frame, text='Save scan', width=15)
+        self.save_button.grid(row=row, column=0, columnspan=2, pady=[5,1])
+        # ===============================================================================
+        # Add more buttons or controls here
+        # ===============================================================================
+
+        # Scan settings view
+        settings_frame = tk.Frame(frame)
+        settings_frame.pack(side=tk.TOP, padx=0, pady=0)
+        # Single axis scan section
+        row = 0
+        tk.Label(settings_frame, 
+                 text='Scan settings', 
+                 font='Helvetica 14').grid(row=row, column=0, pady=[10,5], columnspan=2)
+        # Range of scan
+        row += 1
+        tk.Label(settings_frame, text='Range XY (μm)').grid(row=row, column=0, padx=5, pady=2)
+        self.line_range_xy_entry = tk.Entry(settings_frame, width=10)
+        self.line_range_xy_entry.insert(10, settings_dict['line_range_xy'])
+        self.line_range_xy_entry.grid(row=row, column=1, padx=5, pady=2)
+        self.line_range_xy_entry.config(state='readonly')
+        # Number of pixels
+        row += 1
+        tk.Label(settings_frame, text='Range Z (μm)').grid(row=row, column=0, padx=5, pady=2)
+        self.line_range_z_entry = tk.Entry(settings_frame, width=10)
+        self.line_range_z_entry.insert(10, settings_dict['line_range_z'])
+        self.line_range_z_entry.grid(row=row, column=1, padx=5, pady=2)
+        self.line_range_z_entry.config(state='readonly')
+        # Number of pixels
+        row += 1
+        tk.Label(settings_frame, text='Number of pixels').grid(row=row, column=0, padx=5, pady=2)
+        self.line_pixels_entry = tk.Entry(settings_frame, width=10)
+        self.line_pixels_entry.insert(10, settings_dict['line_pixels'])
+        self.line_pixels_entry.grid(row=row, column=1, padx=5, pady=2)
+        self.line_pixels_entry.config(state='readonly')
+        # Scan speed
+        row += 1
+        tk.Label(settings_frame, text='Time (s)').grid(row=row, column=0, padx=5, pady=2)
+        self.line_time_entry = tk.Entry(settings_frame, width=10)
+        self.line_time_entry.insert(10, settings_dict['line_time'])
+        self.line_time_entry.grid(row=row, column=1, padx=5, pady=2)
+        self.line_time_entry.config(state='readonly')
+
+
+
+
+class ImageScanApplicationView:
+
+    def __init__(self, 
+                 window: tk.Toplevel, 
+                 application,   # LineScanApplication
+                 settings_dict: dict):
+        
+        self.application = application
+        self.settings_dict = settings_dict
+
+        self.data_viewport = ImageDataViewport(window=window)
+        self.control_panel = ImageFigureControlPanel(window=window, settings_dict=settings_dict)
+
+        # Initalize the figure
+        self.update_figure()
+
+    def update_figure(self) -> None:
+        # Clear the axis
+        self.data_viewport.fig.clear()
+        # Create a new axis
+        self.data_viewport.ax = plt.gca()
+
+        pixel_width = self.application.range / self.application.n_pixels
+        extent = [self.application.min_position_1 - pixel_width/2, 
+                  self.application.max_position_1 + pixel_width/2,
+                  self.application.min_position_2 - pixel_width/2,
+                  self.application.max_position_2 + pixel_width/2]
+        
+        # Plot the frame
+        img = self.data_viewport.ax.imshow(self.application.data_z,
+                                           extent = extent,
+                                           cmap = self.application.cmap,
+                                           origin = 'lower',
+                                           aspect = 'equal',
+                                           interpolation = 'none')
+        self.data_viewport.cbar = self.data_viewport.fig.colorbar(img, ax=self.data_viewport.ax)
+
+        self.data_viewport.ax.set_xlabel(f'{self.application.axis_1} position (μm)', fontsize=14)
+        self.data_viewport.ax.set_ylabel(f'{self.application.axis_2} position (μm)', fontsize=14)
+        self.data_viewport.cbar.ax.set_ylabel('Intensity (cts/s)', fontsize=14, rotation=270, labelpad=15)
+        self.data_viewport.ax.grid(alpha=0.3)
+
+        self.data_viewport.canvas.draw()
+
+
+class ImageDataViewport:
+
+    def __init__(self, window):
+
+        # Parent frame for control panel
+        frame = tk.Frame(window)
+        frame.pack(side=tk.LEFT, padx=0, pady=0)
+
+        self.fig = plt.figure()
+        self.ax = plt.gca()
+        self.canvas = FigureCanvasTkAgg(self.fig, master=frame)
+        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        toolbar = NavigationToolbar2Tk(self.canvas, frame)
+        toolbar.update()
+        self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self.canvas.draw()
+
+
+class ImageFigureControlPanel:
+
+    def __init__(self, window: tk.Toplevel, settings_dict: dict):
+
+        # Parent frame for control panel
+        frame = tk.Frame(window)
+        frame.pack(side=tk.TOP, padx=30, pady=20)
+
+        # Frame for saving/modifying data viewport
+        command_frame = tk.Frame(frame)
+        command_frame.pack(side=tk.TOP, padx=0, pady=0)
+        # Add buttons and text
+        row = 0
+        tk.Label(command_frame, 
+                 text='Scan control', 
+                 font='Helvetica 14').grid(row=row, column=0, pady=[0,5], columnspan=2)
+        # Pause button
+        row += 1
+        self.pause_button = tk.Button(command_frame, text='Pause scan', width=15)
+        self.pause_button.grid(row=row, column=0, columnspan=2, pady=[5,1])
+        # Continue button
+        row += 1
+        self.continue_button = tk.Button(command_frame, text='Continue scan', width=15)
+        self.continue_button.grid(row=row, column=0, columnspan=2, pady=[5,1])
+        # Continue button
+        row += 1
+        self.save_button = tk.Button(command_frame, text='Save scan', width=15)
+        self.save_button.grid(row=row, column=0, columnspan=2, pady=[5,1])
+
+        # ===============================================================================
+        # Add more buttons or controls here
+        # ===============================================================================
+
+        # Scan settings view
+        settings_frame = tk.Frame(frame)
+        settings_frame.pack(side=tk.TOP, padx=0, pady=0)
+        # Single axis scan section
+        row = 0
+        tk.Label(settings_frame, 
+                 text='Scan settings', 
+                 font='Helvetica 14').grid(row=row, column=0, pady=[10,5], columnspan=2)
+        row += 1
+        tk.Label(settings_frame, text='Range (μm)').grid(row=row, column=0, padx=5, pady=2)
+        self.image_range_entry = tk.Entry(settings_frame, width=10)
+        self.image_range_entry.insert(0, settings_dict['image_range'])
+        self.image_range_entry.grid(row=row, column=1, padx=5, pady=2)
+        self.image_range_entry.config(state='readonly')
+        # Number of pixels
+        row += 1
+        tk.Label(settings_frame, text='Number of pixels').grid(row=row, column=0, padx=5, pady=2)
+        self.image_pixels_entry = tk.Entry(settings_frame, width=10)
+        self.image_pixels_entry.insert(0, settings_dict['image_pixels'])
+        self.image_pixels_entry.grid(row=row, column=1, padx=5, pady=2)
+        self.image_pixels_entry.config(state='readonly')
+        # Scan speed
+        row += 1
+        tk.Label(settings_frame, text='Time per row (s)').grid(row=row, column=0, padx=5, pady=2)
+        self.image_time_entry = tk.Entry(settings_frame, width=10)
+        self.image_time_entry.insert(0, settings_dict['image_time'])
+        self.image_time_entry.grid(row=row, column=1, padx=5, pady=2)
+        self.image_time_entry.config(state='readonly')

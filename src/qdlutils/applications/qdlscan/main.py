@@ -14,7 +14,8 @@ from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRat
 from qdlutils.applications.qdlscan.application_controller import ScanController
 from qdlutils.applications.qdlscan.application_gui import (
     LauncherApplicationView,
-    LineScanApplicationView
+    LineScanApplicationView,
+    ImageScanApplicationView
 )
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,9 @@ DEFAULT_CONFIG_FILE = 'qdlscan_base.yaml'
 
 # Dictionary for converting axis to an index
 AXIS_INDEX = {'x': 0, 'y': 1, 'z': 2}
+
+# Default color map
+DEFAULT_COLOR_MAP = 'gray'
 
 
 class LauncherApplication():
@@ -47,6 +51,9 @@ class LauncherApplication():
         self.max_x_position = None
         self.max_y_position = None
         self.max_z_position = None
+        self.max_x_range = None
+        self.max_y_range = None
+        self.max_z_range = None
 
         # Number of scan windows launched
         self.number_scans = 0
@@ -64,6 +71,7 @@ class LauncherApplication():
         self.view = LauncherApplicationView(main_window=self.root)
 
         # Bind the buttons
+        self.view.control_panel.image_start_button.bind("<Button>", self.start_image_scan)
         self.view.control_panel.line_start_x_button.bind("<Button>", self.optimize_x_axis)
         self.view.control_panel.line_start_y_button.bind("<Button>", self.optimize_y_axis)
         self.view.control_panel.line_start_z_button.bind("<Button>", self.optimize_z_axis)
@@ -123,6 +131,7 @@ class LauncherApplication():
         # Get the limits
         self.min_x_position = config[APPLICATION_NAME][x_axis_name]['configure']['min_position']
         self.max_x_position = config[APPLICATION_NAME][x_axis_name]['configure']['max_position']
+        self.max_x_range = self.max_x_position - self.min_x_position
 
         # Get the y axis instance
         import_path = config[APPLICATION_NAME][y_axis_name]['import_path']
@@ -135,6 +144,7 @@ class LauncherApplication():
         # Get the limits
         self.min_y_position = config[APPLICATION_NAME][y_axis_name]['configure']['min_position']
         self.max_y_position = config[APPLICATION_NAME][y_axis_name]['configure']['max_position']
+        self.max_y_range = self.max_y_position - self.min_y_position
 
         # Get the z axis instance
         import_path = config[APPLICATION_NAME][z_axis_name]['import_path']
@@ -147,6 +157,7 @@ class LauncherApplication():
         # Get the limits
         self.min_z_position = config[APPLICATION_NAME][z_axis_name]['configure']['min_position']
         self.max_z_position = config[APPLICATION_NAME][z_axis_name]['configure']['max_position']
+        self.max_z_range = self.max_x_position - self.min_x_position
 
         # Get the application controller constructor 
         import_path = config[APPLICATION_NAME]['ApplicationController']['import_path']
@@ -182,9 +193,16 @@ class LauncherApplication():
         pass
 
     def optimize_x_axis(self, tkinter_event=None):
+        if self.application_controller.busy:
+            logger.error(f'Application controller is current busy.')
+            return None
         logger.info('Optimizing X axis.')
         # Update the parameters
-        self._get_scan_config()
+        try:
+            self._get_scan_config()
+        except Exception as e:
+            logger.error(f'Scan parameters are invalid: {e}')
+            return None
         # Increase the nunmber of scans launched
         self.number_scans += 1
         # Launch a line scan application
@@ -197,10 +215,18 @@ class LauncherApplication():
             time = self.scan_parameters['line_time'],
             id = self.number_scans
         )
+
     def optimize_y_axis(self, tkinter_event=None):
+        if self.application_controller.busy:
+            logger.error(f'Application controller is current busy.')
+            return None
         logger.info('Optimizing Y axis.')
         # Update the parameters
-        self._get_scan_config()
+        try:
+            self._get_scan_config()
+        except Exception as e:
+            logger.error(f'Scan parameters are invalid: {e}')
+            return None
         # Increase the nunmber of scans launched
         self.number_scans += 1
         # Launch a line scan application
@@ -213,10 +239,18 @@ class LauncherApplication():
             time = self.scan_parameters['line_time'],
             id = self.number_scans
         )
+
     def optimize_z_axis(self, tkinter_event=None):
+        if self.application_controller.busy:
+            logger.error(f'Application controller is current busy.')
+            return None
         logger.info('Optimizing Z axis.')
         # Update the parameters
-        self._get_scan_config()
+        try:
+            self._get_scan_config()
+        except Exception as e:
+            logger.error(f'Scan parameters are invalid: {e}')
+            return None
         # Increase the nunmber of scans launched
         self.number_scans += 1
         # Launch a line scan application
@@ -229,10 +263,35 @@ class LauncherApplication():
             time = self.scan_parameters['line_time'],
             id = self.number_scans
         )
+
+    def start_image_scan(self, tkinter_event=None):
+        if self.application_controller.busy:
+            logger.error(f'Application controller is current busy.')
+            return None
+        logger.info('Starting confocal image scan.')
+        # Update the parameters
+        try:
+            self._get_scan_config()
+        except Exception as e:
+            logger.error(f'Scan parameters are invalid: {e}')
+            return None
+        # Increase the nunmber of scans launched
+        self.number_scans += 1
+        # Launch a image scan application
+        self.current_scan = ImageScanApplication(
+            parent_application = self,
+            application_controller = self.application_controller,
+            axis_1 = 'x',
+            axis_2 = 'y',
+            range = self.scan_parameters['image_range'],
+            n_pixels = self.scan_parameters['image_pixels'],
+            time = self.scan_parameters['image_time'],
+            id = self.number_scans
+        )
     
     def _get_scan_config(self) -> dict:
         '''
-        Get the values in the GUI
+        Get the values in the GUI validate if they are allowable
         '''
         image_range = float(self.view.control_panel.image_range_entry.get())
         image_pixels = int(self.view.control_panel.image_pixels_entry.get())
@@ -242,6 +301,50 @@ class LauncherApplication():
         line_pixels = int(self.view.control_panel.line_pixels_entry.get())
         line_time = float(self.view.control_panel.line_time_entry.get())
 
+        # Check image range
+        if image_range < 0.1:
+            raise ValueError(f'Requested scan range {image_range} < 100 nm is too small.')
+        if image_range > self.max_x_range:
+            raise ValueError(f'Requested image scan range {image_range}'
+                             +f' exceeds the x limit {self.max_x_range}.')
+        if image_range > self.max_y_range:
+            raise ValueError(f'Requested image scan range {image_range}'
+                             +f' exceeds the y limit {self.max_x_range}.')
+        if image_range > self.max_z_range:
+            raise ValueError(f'Requested image scan range {image_range}'
+                             +f' exceeds the z limit {self.max_x_range}.')
+        # Check the image pixels
+        if image_pixels < 1:
+            raise ValueError(f'Requested image pixels {image_pixels} < 1 is too small.')
+        # check the image time
+        if image_time < 0.001:
+            raise ValueError(f'Requested image scan time {image_time} < 1 ms is too small.')
+
+        # Check the line xy range
+        if line_range_xy < 0.1:
+            raise ValueError(f'Requested scan range {line_range_xy} < 100 nm is too small.')
+        if line_range_xy > self.max_x_range:
+            raise ValueError(f'Requested xy scan range {line_range_xy}'
+                             +f' exceeds the x limit {self.max_x_range}.')
+        if line_range_xy > self.max_y_range:
+            raise ValueError(f'Requested xy scan range {line_range_xy}'
+                             +f' exceeds the y limit {self.max_y_range}.')
+        # check the line z range
+        if line_range_z < 0.1:
+            raise ValueError(f'Requested scan range {line_range_z} < 100 nm is too small.')
+        if line_range_z > self.max_z_range:
+            raise ValueError(f'Requested z scan range {line_range_z}'
+                             +f' exceeds the z limit {self.max_z_range}.')
+        # Check the line pixels
+        if line_pixels < 1:
+            raise ValueError(f'Requested line pixels {line_pixels} < 1 is too small.')
+        # check the line time
+        if line_time < 0.001:
+            raise ValueError(f'Requested line scan time {line_time} < 1 ms is too small.')
+        if line_time > 300:
+            raise ValueError(f'Requested line scan time {line_time} > 5 min is too long.')
+
+        # Write to application memory
         self.scan_parameters = {
             'image_range': image_range,
             'image_pixels': image_pixels,
@@ -253,7 +356,7 @@ class LauncherApplication():
         }
 
 
-class LineScanApplication():
+class LineScanApplication:
     '''
     This is the line scan application class for `qdlscan` which manages the actual
     application controllers and GUI output of a single scan. It is meant to handle
@@ -296,21 +399,26 @@ class LineScanApplication():
             raise ValueError(f'Requested axis {axis} is invalid.')
 
         # Get the starting position
-        start_position = application_controller.get_position()
+        self.start_position_vector = application_controller.get_position()
+        self.start_position_axis = self.start_position_vector[AXIS_INDEX[axis]]
+        self.final_position_vector = None
+        self.final_position_axis = None
         # Get the limits of the scan
-        self.min_position = start_position[AXIS_INDEX[axis]] - (range/2)
-        self.max_position = start_position[AXIS_INDEX[axis]] + (range/2)
+        self.min_position = self.start_position_axis - (range/2)
+        self.max_position = self.start_position_axis + (range/2)
         # Check if the limits exceed the range and shift range to edge
         if self.min_position < min_allowed_position:
             # Too close to minimum edge, need to shift up
             shift = min_allowed_position - self.min_position
             self.min_position += shift
             self.max_position += shift
+            self.start_position_axis += shift
         if self.max_position > max_allowed_position:
             # Too close to minimum edge, need to shift up
             shift = max_allowed_position - self.max_position
             self.min_position += shift
             self.max_position += shift
+            self.start_position_axis += shift
         # Get the scan positions (along whatever axis is being scanned)
         # We're brute forcing it here as the application controller might not sample
         # positions in the exact same way...
@@ -319,12 +427,15 @@ class LineScanApplication():
                                   num=n_pixels)
         # To hold scan results
         self.data_y = np.empty(shape=n_pixels)
+        self.data_y[:] = np.nan
 
         # Launch the line scan GUI
         # Then initialize the GUI
         self.root = tk.Toplevel()
         self.root.title(f'Scan {id} ({self.timestamp.strftime("%Y-%m-%d %H:%M:%S")})')
-        self.view = LineScanApplicationView() # Meed to add arguments...
+        self.view = LineScanApplicationView(window=self.root, 
+                                            application=self,
+                                            settings_dict=parent_application.scan_parameters)
 
         # Start the scan thread
         # Launch the thread
@@ -335,7 +446,7 @@ class LineScanApplication():
         try:
             logger.info('Starting scan thread.')
             logger.info(f'Starting scan on axis {self.axis}')
-            # Run the scan
+            # Run the scan (returns raw counts)
             self.data_y = self.application_controller.scan_axis(
                 axis = self.axis,
                 start = self.min_position,
@@ -343,15 +454,34 @@ class LineScanApplication():
                 n_pixels = self.n_pixels,
                 scan_time = self.time
             )
+            # Normalize to counts per second
+            self.data_y = self.data_y / self.time_per_pixel
+            # Optimize the position
+            self.optimize_position()
             # Update the viewport
-            self.view.data_viewport.update()
+            self.view.update_figure()
             
-            print(self.data_y) # DEBUG
+            # DEBUG ============================
+            print(self.data_y)
+            # DEBUG ============================
+
             logger.info('Scan complete.')
         except Exception as e:
             logger.info(e)
         # Enable the buttons
         self.parent_application.enable_buttons()
+
+    def optimize_position(self):
+
+        '''
+        Here need to implement something to move the axes to optimize the signal
+        '''
+
+        # For now just set the final position to the start position
+        self.final_position_axis = self.start_position_axis
+
+        # Move to optmial position
+        self.application_controller.set_axis(axis=self.axis, position=self.final_position_axis)
 
 
 class ImageScanApplication():
@@ -361,30 +491,206 @@ class ImageScanApplication():
     2-d confocal scans.
     '''
 
-    def __init__(self, ):
+    def __init__(self,
+                 parent_application: LauncherApplication,
+                 application_controller: ScanController,
+                 axis_1: str,
+                 axis_2: str,
+                 range: float,
+                 n_pixels: int,
+                 time: float,
+                 id: str):
         
-        pass
+        
+        self.parent_application = parent_application
+        self.application_controller = application_controller
+        self.axis_1 = axis_1
+        self.axis_2 = axis_2
+        self.range = range
+        self.n_pixels = n_pixels
+        self.time = time
 
-    def scan_thread_function(self):
+        # Time per pixel
+        self.time_per_pixel = time / n_pixels
+
+        # Cmap for plotting
+        self.cmap = DEFAULT_COLOR_MAP
+
+        self.id = id
+        self.timestamp = datetime.datetime.now()
+
+        # Get the limits of the position for the axis
+        if axis_1 == 'x':
+            min_allowed_position_1 = self.parent_application.min_x_position
+            max_allowed_position_1 = self.parent_application.max_x_position
+        elif axis_1 == 'y':
+            min_allowed_position_1 = self.parent_application.min_y_position
+            max_allowed_position_1 = self.parent_application.max_y_position
+        elif axis_1 == 'z':
+            min_allowed_position_1 = self.parent_application.min_z_position
+            max_allowed_position_1 = self.parent_application.max_z_position
+        else:
+            raise ValueError(f'Requested axis_1 {axis_1} is invalid.')
+        if axis_2 == 'x':
+            min_allowed_position_2 = self.parent_application.min_x_position
+            max_allowed_position_2 = self.parent_application.max_x_position
+        elif axis_2 == 'y':
+            min_allowed_position_2 = self.parent_application.min_y_position
+            max_allowed_position_2 = self.parent_application.max_y_position
+        elif axis_2 == 'z':
+            min_allowed_position_2 = self.parent_application.min_z_position
+            max_allowed_position_2 = self.parent_application.max_z_position
+        else:
+            raise ValueError(f'Requested axis_2 {axis_2} is invalid.')
+
+        # Get the starting position
+        self.start_position_vector = application_controller.get_position()
+        self.start_position_axis_1 = self.start_position_vector[AXIS_INDEX[axis_1]]
+        self.start_position_axis_2 = self.start_position_vector[AXIS_INDEX[axis_2]]
+
+        # Get the limits of the scan on axis 1
+        self.min_position_1 = self.start_position_axis_1 - (range/2)
+        self.max_position_1 = self.start_position_axis_1 + (range/2)
+        # Check if the limits exceed the range and shift range to edge
+        if self.min_position_1 < min_allowed_position_1:
+            # Too close to minimum edge, need to shift up
+            shift = min_allowed_position_1 - self.min_position_1
+            self.min_position_1 += shift
+            self.max_position_1 += shift
+            self.start_position_axis_1 += shift
+        if self.max_position_1 > max_allowed_position_1:
+            # Too close to minimum edge, need to shift up
+            shift = max_allowed_position_1 - self.max_position_1
+            self.min_position_1 += shift
+            self.max_position_1 += shift
+            self.start_position_axis_1 += shift
+        # Get the limits of the scan on axis 2
+        self.min_position_2 = self.start_position_axis_2 - (range/2)
+        self.max_position_2 = self.start_position_axis_2 + (range/2)
+        # Check if the limits exceed the range and shift range to edge
+        if self.min_position_2 < min_allowed_position_2:
+            # Too close to minimum edge, need to shift up
+            shift = min_allowed_position_2 - self.min_position_2
+            self.min_position_2 += shift
+            self.max_position_2 += shift
+            self.start_position_axis_2 += shift
+        if self.max_position_2 > max_allowed_position_2:
+            # Too close to minimum edge, need to shift up
+            shift = max_allowed_position_2 - self.max_position_2
+            self.min_position_2 += shift
+            self.max_position_2 += shift
+            self.start_position_axis_2 += shift
+
+        # Get the scan positions
+        self.data_x = np.linspace(start=self.min_position_1, 
+                                  stop=self.max_position_1, 
+                                  num=n_pixels)
+        self.data_y = np.linspace(start=self.min_position_2, 
+                                  stop=self.max_position_2, 
+                                  num=n_pixels)
+        # To hold scan results
+        self.data_z = np.empty(shape=(n_pixels, n_pixels))
+        self.data_z[:,:] = np.nan
+
+        # Launch the line scan GUI
+        # Then initialize the GUI
+        self.root = tk.Toplevel()
+        self.root.title(f'Scan {id} ({self.timestamp.strftime("%Y-%m-%d %H:%M:%S")})')
+        self.view = ImageScanApplicationView(window=self.root, 
+                                            application=self,
+                                            settings_dict=parent_application.scan_parameters)
+
+        # Launch the thread
+        self.scan_thread = Thread(target=self.start_scan_thread_function)
+        self.scan_thread.start()
+
+    def continue_scan(self):
+        # Start the scan thread
+        # Launch the thread
+        self.scan_thread = Thread(target=self.continue_scan_thread_function)
+        self.scan_thread.start()
+
+    def start_scan_thread_function(self):
         '''
-        THis is wrong but has the right structure.
+        This is the thread scan function for starting a scan
         '''
         try:
-            while self.application_controller.busy:
-                self.current_scan.application_controller.scan_wavelengths()
-                self.current_scan.view.data_viewport.update_image_and_plot(self.current_scan.application_controller)
-                self.current_scan.view.canvas.draw()
+            self.current_scan_index = 0
+            for line in self.application_controller.scan_image(
+                            axis_1=self.axis_1,
+                            start_1=self.min_position_1,
+                            stop_1=self.max_position_1,
+                            n_pixels_1=self.n_pixels,
+                            axis_2=self.axis_2,
+                            start_2=self.min_position_2,
+                            stop_2=self.max_position_2,
+                            n_pixels_2=self.n_pixels,
+                            scan_time=self.time):
+                # Set the data to the recently calculated line (in counts/second)
+                self.data_z[self.current_scan_index] = line / self.time_per_pixel
+                # Update the figure
+                self.view.update_figure()
+                # Increase the current scan index
+                self.current_scan_index += 1
 
+                # DEBUG ============================
+                print(line)
+                # DEBUG ============================
+
+            self.home_position()
             logger.info('Scan complete.')
-            self.current_scan.application_controller.stop()
 
-        except nidaqmx.errors.DaqError as e:
+        except Exception as e:
             logger.info(e)
-            logger.info(
-                'Check for other applications using resources. If not, you may need to restart the application.')
+        # Enable the buttons
+        self.parent_application.enable_buttons()
 
-        self.enable_buttons()
+    def continue_scan_thread_function(self):
+        '''
+        This is is the thread function to continue the scan from the middle.
 
+        It would probably be the same as the start scan thread function if the 
+        current_scan_index was set to begin with.
+        '''
+        try:
+            for line in self.application_controller.scan_image(
+                            axis_1=self.axis_1,
+                            start_1=self.min_position_1,
+                            stop_1=self.max_position_1,
+                            n_pixels_1=self.n_pixels,
+                            axis_2=self.axis_2,
+                            start_2= self.data_y[self.current_scan_index], # Start at the index of the next queued scan
+                            stop_2=self.max_position_2,
+                            n_pixels_2=(self.n_pixels - self.current_scan_index), # Do the remaining pixels
+                            scan_time=self.time):
+                # Set the data to the recently calculated line (in counts/second)
+                self.data_z[self.current_scan_index] = line / self.time_per_pixel
+                # Update the figure
+                self.view.update_figure()
+                # Increase the current scan index
+                self.current_scan_index += 1
+
+                # DEBUG ============================
+                print(line)
+                # DEBUG ============================
+
+            self.home_position()
+            logger.info('Scan complete.')
+
+        except Exception as e:
+            logger.info(e)
+        # Enable the buttons
+        self.parent_application.enable_buttons()
+
+    def home_position(self):
+
+        '''
+        Go to the center of the scan
+        '''
+        # Move to optmial position
+        self.application_controller.set_axis(axis=self.axis_1, position=self.start_position_axis_1)
+        # Move to optmial position
+        self.application_controller.set_axis(axis=self.axis_2, position=self.start_position_axis_2)
 
 
 def main():
