@@ -31,17 +31,61 @@ AXIS_INDEX = {'x': 0, 'y': 1, 'z': 2}
 DEFAULT_COLOR_MAP = 'gray'
 
 
-class LauncherApplication():
+class LauncherApplication:
     '''
-    This is the launcher class for the `qdlscan` application which handles the creation
-    of child scan applications which themselves handle the main scanning.
+    This is the launcher class for the `qdlscan` application which handles the 
+    initalization of individual scanning confocal measurements. This application is
+    serves as a replacement of `qt3scan` which relies on some of the older architecture
+    for DAQ interfacing. The overall application structure is described below:
 
-    The purpose of this class is to provde a means of configuring the scan proprties,
-    control the DAQ outputs and launching the scans themselves.
+    The central class of the application is the `ScanController` which is located in
+    `qdlscan/application_controller.py`. This class manages the hardware, which is by
+    default NIDAQ-controlled piezos (`NidaqPositionController` in 
+    `qdlutils/hardware/nidaq/analogoutputs/nidaqposition.py`) and NIDAQ edge counter
+    (`NidaqTimedRateCounter` in `qdlutils/hardware/nidaq/counters/nidaqtimedratecounter.py`)
+    however a suitably designed alternative class for other hardware could also be
+    reasonably used without much effort.
+
+    `ScanController` handles the actual movement of the piezos and coordinates it with
+    the counters in order to perform basic confocal scanning measurements. The 
+    application launches and instantiates a single `ScanController`, dubbed the 
+    "application controller", which it uses to perform scans. The application 
+    controller can be queried to move the piezos or perform specifc scans. Since it is
+    shared by all scans performed in the application session, it has built-in logic to
+    ignore calls when it is busy, aided by threading. If one desires to perform 
+    confocal scanning is appreciably different hardware, then the scan controller
+    could also be rewritten to interface with it if the current implementation does
+    not immediately work.
+
+    The `LauncherApplication` is the other main class. It instantiates the `ScanController`
+    and creates a GUI (`LauncherApplicationView`) which allows the user to input scan
+    parameters and to launch image and line scans, as well as move the piezos directly.
+
+    When an image or line scan is launched, the parameters are read out from the GUI and
+    a new instance of the `ImageScanApplication` or `LineScanApplication` are created
+    in each case respectively. These sub-applications contain metadata and actual 
+    measured data for the given scan (or set of scans) that they represent. On
+    initialization, they comppute (from the GUI inputs) information to setup the scan(s),
+    making adjustments if needed, and then begin scanning in a thread. After, or between,
+    scans, these sub-applications store the results and update the figure. Additionally,
+    these sub-applications also handle the saving, pausing, and continuing of scans where
+    applicable.
+
+    For additional details about the individual components please see their docstrings.
     '''
 
-    def __init__(self, default_config_filename: str):
+    def __init__(self, default_config_filename: str) -> None:
+        '''
+        Initialization for the LauncherApplication class. It loads the application
+        controller and various hardware, then creates a GUI and binds the buttons.
+        Callback methods for the GUI interactions are contained in this class.
         
+        Parameters
+        ----------
+        default_config_filename: str
+            Filename of the default config YAML file. It must be located in the
+            `qdlscan/config_files` directory.
+        '''
         # Attributes
         self.application_controller = None
         self.min_x_position = None
@@ -66,7 +110,7 @@ class LauncherApplication():
         # Last save directory
         self.last_save_directory = None
 
-        # Load the YAML file based off of `controller_name`
+        # Load the YAML file
         self.load_yaml_from_name(yaml_filename=default_config_filename)
 
         # Initialize the root tkinter widget (window housing GUI)
@@ -86,7 +130,7 @@ class LauncherApplication():
 
     def run(self) -> None:
         '''
-        This function launches the application itself.
+        This function launches the application including the GUI
         '''
         # Set the title of the app window
         self.root.title("qdlscan")
@@ -102,6 +146,11 @@ class LauncherApplication():
 
         This method instantiates and configures the controllers and counters
         for the scan application, then creates the application controller.
+
+        Parameters
+        ----------
+        afile: str
+            Full-path filename of the YAML config file.
         '''
         with open(afile, 'r') as file:
             # Log selection
@@ -187,20 +236,35 @@ class LauncherApplication():
 
     def load_yaml_from_name(self, yaml_filename: str) -> None:
         '''
-        Loads the default yaml configuration file for the application controller.
+        Loads the yaml configuration file from name.
 
         Should be called during instantiation of this class and should be the callback
-        function for the support controller pull-down menu in the side panel
+        function for loading of other standard yaml files while running.
+
+        Parameters
+        ----------
+        yaml_filename: str
+            Filename of the .yaml file in the qdlscan/config_files path.
         '''
         yaml_path = importlib.resources.files(CONFIG_PATH).joinpath(yaml_filename)
         self.configure_from_yaml(str(yaml_path))
 
-    def enable_buttons(self):
+    def enable_buttons(self) -> None:
         pass
-    def disable_buttons(self):
+    def disable_buttons(self) -> None:
         pass
 
-    def optimize_x_axis(self, tkinter_event=None):
+    def optimize_x_axis(self, tkinter_event=None) -> None:
+        '''
+        Callback to optimize X button in launcher GUI.
+        Gets the config data written in the GUI. If it is valid then it will create an 
+        instnace of the `LineScanApplication` class to scan the axis.
+
+        Parameters
+        ----------
+        tkinter_event: tk.Event
+            The button press event, not used.
+        '''
         if self.application_controller.busy:
             logger.error(f'Application controller is current busy.')
             return None
@@ -224,7 +288,17 @@ class LauncherApplication():
             id = str(self.number_scans).zfill(3)
         )
 
-    def optimize_y_axis(self, tkinter_event=None):
+    def optimize_y_axis(self, tkinter_event=None) -> None:
+        '''
+        Callback to optimize Y button in launcher GUI.
+        Gets the config data written in the GUI. If it is valid then it will create an 
+        instnace of the `LineScanApplication` class to scan the axis.
+
+        Parameters
+        ----------
+        tkinter_event: tk.Event
+            The button press event, not used.
+        '''
         if self.application_controller.busy:
             logger.error(f'Application controller is current busy.')
             return None
@@ -248,7 +322,17 @@ class LauncherApplication():
             id = str(self.number_scans).zfill(3)
         )
 
-    def optimize_z_axis(self, tkinter_event=None):
+    def optimize_z_axis(self, tkinter_event=None) -> None:
+        '''
+        Callback to optimize Z button in launcher GUI.
+        Gets the config data written in the GUI. If it is valid then it will create an 
+        instnace of the `LineScanApplication` class to scan the axis.
+
+        Parameters
+        ----------
+        tkinter_event: tk.Event
+            The button press event, not used.
+        '''
         if self.application_controller.busy:
             logger.error(f'Application controller is current busy.')
             return None
@@ -272,7 +356,17 @@ class LauncherApplication():
             id = str(self.number_scans).zfill(3)
         )
 
-    def start_image_scan(self, tkinter_event=None):
+    def start_image_scan(self, tkinter_event=None) -> None:
+        '''
+        Callback to start scan button in launcher GUI.
+        Gets the config data written in the GUI. If it is valid then it will create an 
+        instnace of the `ImageScanApplication` class to create a confocal scan image.
+
+        Parameters
+        ----------
+        tkinter_event: tk.Event
+            The button press event, not used.
+        '''
         if self.application_controller.busy:
             logger.error(f'Application controller is current busy.')
             return None
@@ -297,7 +391,16 @@ class LauncherApplication():
             id = str(self.number_scans).zfill(3)
         )
     
-    def set_x_axis(self, tkinter_event=None):
+    def set_x_axis(self, tkinter_event=None) -> None:
+        '''
+        Callback to set X button in launcher GUI.
+        Sets the axis position to what is entered in the GUI if valid.
+
+        Parameters
+        ----------
+        tkinter_event: tk.Event
+            The button press event, not used.
+        '''
         try:
             self._get_daq_config()
             position = self.daq_parameters['x_position']
@@ -306,7 +409,16 @@ class LauncherApplication():
         except Exception as e:
             logger.error(f'Error with setting x axis: {e}')
 
-    def set_y_axis(self, tkinter_event=None):
+    def set_y_axis(self, tkinter_event=None) -> None:
+        '''
+        Callback to set Y button in launcher GUI.
+        Sets the axis position to what is entered in the GUI if valid.
+
+        Parameters
+        ----------
+        tkinter_event: tk.Event
+            The button press event, not used.
+        '''
         try:
             self._get_daq_config()
             position = self.daq_parameters['y_position']
@@ -315,7 +427,16 @@ class LauncherApplication():
         except Exception as e:
             logger.error(f'Error with setting y axis: {e}')
         
-    def set_z_axis(self, tkinter_event=None):
+    def set_z_axis(self, tkinter_event=None) -> None:
+        '''
+        Callback to set Z button in launcher GUI.
+        Sets the axis position to what is entered in the GUI if valid.
+
+        Parameters
+        ----------
+        tkinter_event: tk.Event
+            The button press event, not used.
+        '''
         try:
             self._get_daq_config()
             position = self.daq_parameters['z_position']
@@ -324,8 +445,16 @@ class LauncherApplication():
         except Exception as e:
             logger.error(f'Error with setting z axis: {e}')
         
-    def get_coordinates(self, tkinter_event=None):
-        
+    def get_coordinates(self, tkinter_event=None) -> None:
+        '''
+        Callback to get position button in launcher GUI.
+        Populates the GUI DAQ position entries with the current position.
+
+        Parameters
+        ----------
+        tkinter_event: tk.Event
+            The button press event, not used.
+        '''    
         x,y,z = self.application_controller.get_position()
         self.view.control_panel.x_axis_set_entry.delete(0, 'end')
         self.view.control_panel.y_axis_set_entry.delete(0, 'end')
@@ -334,9 +463,10 @@ class LauncherApplication():
         self.view.control_panel.y_axis_set_entry.insert(0, y)
         self.view.control_panel.z_axis_set_entry.insert(0, z)
 
-    def _get_scan_config(self) -> dict:
+    def _get_scan_config(self) -> None:
         '''
-        Get the values in the GUI validate if they are allowable
+        Gets the scan parameters in the GUI and validates if they are allowable. Then 
+        saves the GUI input to the launcher application if valid.
         '''
         image_range = float(self.view.control_panel.image_range_entry.get())
         image_pixels = int(self.view.control_panel.image_pixels_entry.get())
@@ -400,8 +530,11 @@ class LauncherApplication():
             'line_time': line_time,
         }
 
-    def _get_daq_config(self):
-
+    def _get_daq_config(self) -> None:
+        '''
+        Gets the position parameters in the GUI and validates if they are allowable. 
+        Then saves the GUI input to the launcher application if valid.
+        '''
         x_position = float(self.view.control_panel.x_axis_set_entry.get())
         y_position = float(self.view.control_panel.y_axis_set_entry.get())
         z_position = float(self.view.control_panel.z_axis_set_entry.get())
@@ -423,9 +556,9 @@ class LauncherApplication():
 
 class LineScanApplication:
     '''
-    This is the line scan application class for `qdlscan` which manages the actual
-    application controllers and GUI output of a single scan. It is meant to handle
-    1-d confocal scans.
+    This is the line scan application class for `qdlscan` which manages the data
+    and GUI output for a single scan along a particular axis. It is meant to handle
+    1-d confocal scans for position optimization, although it could be made configurable.
     '''
 
     def __init__(self, 
@@ -446,6 +579,9 @@ class LineScanApplication:
 
         # Time per pixel
         self.time_per_pixel = time / n_pixels
+
+        # Optimization type
+        self.optimization_method = 'none'
 
         self.id = id
         self.timestamp = datetime.datetime.now()
@@ -477,14 +613,12 @@ class LineScanApplication:
             shift = min_allowed_position - self.min_position
             self.min_position += shift
             self.max_position += shift
-            #self.start_position_axis += shift
         if self.max_position > max_allowed_position:
             # Too close to minimum edge, need to shift up
             logger.warning('Start position too close to edge, shifting.')
             shift = max_allowed_position - self.max_position
             self.min_position += shift
             self.max_position += shift
-            #self.start_position_axis += shift
         # Get the scan positions (along whatever axis is being scanned)
         # We're brute forcing it here as the application controller might not sample
         # positions in the exact same way...
@@ -511,7 +645,7 @@ class LineScanApplication:
         self.scan_thread = Thread(target=self.scan_thread_function)
         self.scan_thread.start()
 
-    def scan_thread_function(self):
+    def scan_thread_function(self) -> None:
         try:
             logger.info('Starting scan thread.')
             logger.info(f'Starting scan on axis {self.axis}')
@@ -526,7 +660,7 @@ class LineScanApplication:
             # Normalize to counts per second
             self.data_y = self.data_y / self.time_per_pixel
             # Optimize the position
-            self.optimize_position()
+            self.update_position()
             # Update the viewport
             self.view.update_figure()
 
@@ -536,19 +670,34 @@ class LineScanApplication:
         # Enable the buttons
         self.parent_application.enable_buttons()
 
-    def optimize_position(self):
-
+    def update_position(self) -> None:
         '''
-        Here need to implement something to move the axes to optimize the signal
+        A function to update the position of the piezos after a scan has been completed.
+        Can eventually setup for multiple optimization techniques/methods.
         '''
-
-        # For now just set the final position to the start position
-        self.final_position_axis = self.start_position_axis
+        # Default behavior
+        if self.optimization_method == 'none':
+            # Do nothing
+            self._optimization_method_none()
+        # Fit the data to a gaussian and move to peak
+        elif self.optimization_method == 'gaussian':
+            pass
+        # Move to location with highest density?
+        elif self.optimization_method == 'density':
+            pass
 
         # Move to optmial position
         self.application_controller.set_axis(axis=self.axis, position=self.final_position_axis)
 
-    def save_scan(self, tkinter_event=None):
+    def _optimization_method_none(self) -> None:
+        '''
+        Internal method for determining the optimal position.
+
+        For this method we do nothing and just reset the position to the start postion.
+        '''
+        self.final_position_axis = self.start_position_axis
+        
+    def save_scan(self, tkinter_event=None) -> None:
         '''
         Method to save the data, you can add more logic later for other filetypes.
         The event input is to catch the tkinter event that is supplied but not used.
@@ -652,9 +801,9 @@ class LineScanApplication:
 
 class ImageScanApplication():
     '''
-    This is the image scan application class for `qdlscan` which manages the actual
-    application controllers and GUI output of a single scan. It is meant to handle 
-    2-d confocal scans.
+    This is the image scan application class for `qdlscan` which manages the data
+    and GUI output for a single scan along a particular axis. It is meant to handle
+    2-d confocal images, but could be used for scans in any pair of axes.
     '''
 
     def __init__(self,
