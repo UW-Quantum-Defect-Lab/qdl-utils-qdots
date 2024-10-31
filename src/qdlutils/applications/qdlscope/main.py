@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import datetime
 import h5py
+import time
 
 from threading import Thread
 import tkinter as tk
@@ -22,6 +23,24 @@ DEFAULT_CONFIG_FILE = 'qdlscope_base.yaml'
 
 
 class ScopeApplication:
+    '''
+    
+    Due to the implementation of the continuous scanning there is a slight overhead
+    associated to each data sample which results in an increased time between samples.
+
+    Based off of the current implementation and testing with the time module, it seems
+    like the majority of the overhead is due to the updating of the figure (about 50 ms
+    at 500 samples per view). The actual overhead associated with the sampling appears
+    to be quite miniminal for the desired data (< 1 ms in all cases).
+
+    This discrepancy can be problematic if the scope data is desired to be accurate.
+
+    There are a few ways of remedying this:
+        1.  One could simply generate the timestamp for each sample via `time.time()`
+            and then append this to the `self.data_x`.
+        2.  Change the plotting funciton to reduce the overhead further
+        3.  
+    '''
 
     def __init__(self, default_config_filename: str):
         
@@ -88,10 +107,15 @@ class ScopeApplication:
         #try:
         logger.info('Starting continuous sampling thread.')
 
+        current_time =time.time()
+        past_time = time.time()
         for sample in self.application_controller.read_counts_continuous(
                             sample_time = self.daq_parameters['sample_time'], 
                             get_rate = self.daq_parameters['get_rate']):
             
+            current_time = time.time()
+            print(current_time - past_time)
+
             # Save the data
             self.data_y.append(sample)
 
@@ -99,6 +123,10 @@ class ScopeApplication:
 
             # Update the viewport
             self.view.update_figure()
+
+            past_time = time.time()
+
+            
 
         # Get the x data vector
         self.data_x = np.arange(len(self.data_y)) * self.daq_parameters['sample_time']
