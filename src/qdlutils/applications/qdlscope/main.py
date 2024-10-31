@@ -11,7 +11,6 @@ import tkinter as tk
 import yaml
 
 import qdlutils
-from qdlutils.applications.qdlscope.application_controller import ScopeController
 from qdlutils.applications.qdlscope.application_gui import ScopeApplicationView
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,9 @@ class ScopeApplication:
     at 500 samples per view). The actual overhead associated with the sampling appears
     to be quite miniminal for the desired data (< 1 ms in all cases).
 
-    This discrepancy can be problematic if the scope data is desired to be accurate.
+    This discrepancy can be problematic if the scope sample times are of importance (for
+    example, if one is trying to fit a slow exponential decay). Currently we handle this
+    by recording the total time between the start/stop of the 
 
     There are a few ways of remedying this:
         1.  One could simply generate the timestamp for each sample via `time.time()`
@@ -47,12 +48,18 @@ class ScopeApplication:
         self.application_controller = None
 
         # Data
-        self.data_x = None
+        self.data_x = []
         self.data_y = []
+        self.total_measurement_time = 0
 
-        # Plotting parameters
+        # Parameters
         self.max_samples_to_plot = 500
-        self.daq_parameters = None
+        self.max_allowed_samples = 1000000 # 1e6 ~ 3 hours at 0.01 s per sample.
+        self.daq_parameters = {
+            'sample_time': 0.01,
+            'get_rate': True,
+        }
+        self.timestamp = datetime.datetime.now()
 
         # Last save directory
         self.last_save_directory = None
@@ -69,7 +76,10 @@ class ScopeApplication:
         self.view.control_panel.start_button.bind("<Button>", self.start_continuous_sampling)
         self.view.control_panel.pause_button.bind("<Button>", self.stop_sampling)
         self.view.control_panel.reset_button.bind("<Button>", self.reset_data)
-        #self.view.control_panel.save_button.bind("<Button>", self.save_scan)
+        self.view.control_panel.save_button.bind("<Button>", self.save_data)
+
+        # Enable the buttons
+        self.enable_buttons()
 
     def run(self) -> None:
         '''
@@ -83,13 +93,27 @@ class ScopeApplication:
         self.root.mainloop()
 
     def enable_buttons(self):
-        pass
+        self.view.control_panel.sample_time_entry.config(state='normal')
+        self.view.control_panel.raw_counts_checkbutton.config(state='normal')
+        self.view.control_panel.start_button.config(state='normal')
+        self.view.control_panel.pause_button.config(state='disabled')
+        self.view.control_panel.reset_button.config(state='disabled')
+        self.view.control_panel.save_button.config(state='disabled')
 
     def disable_buttons(self):
-        pass
+        self.view.control_panel.sample_time_entry.config(state='disabled')
+        self.view.control_panel.raw_counts_checkbutton.config(state='disabled')
+        self.view.control_panel.start_button.config(state='disabled')
+        self.view.control_panel.pause_button.config(state='normal')
+        self.view.control_panel.reset_button.config(state='disabled')
+        self.view.control_panel.save_button.config(state='disabled')
 
     def start_continuous_sampling(self, tkinter_event: tk.Event = None):
         
+        # Catch if already running
+        if self.application_controller.running:
+            return None
+
         logger.info('Starting continuous sampling.')
 
         # Disable the buttons
@@ -98,64 +122,164 @@ class ScopeApplication:
         # Get the data
         self._get_daq_config()
 
+        # Reset the figure if data is reset
+        if len(self.data_x) == 0:
+            self.view.initialize_figure()
+
         # Launch the thread
         self.scan_thread = Thread(target=self.sample_continuous_thread_function)
         self.scan_thread.start()
-
 
     def sample_continuous_thread_function(self) -> None:
         #try:
         logger.info('Starting continuous sampling thread.')
 
-        current_time =time.time()
-        past_time = time.time()
+        # Log the start of the measurement
+        start_time = time.time()
         for sample in self.application_controller.read_counts_continuous(
                             sample_time = self.daq_parameters['sample_time'], 
                             get_rate = self.daq_parameters['get_rate']):
-            
-            current_time = time.time()
-            print(current_time - past_time)
 
+            # Logging the measurement time directly for each sample
+            # This is probably inefficient and will decrease the actual sample rate
+            # Although it should be negligible.
+            # In this current configuration the logged time corresponds to the end of the
+            # sample time bin.
+            self.data_x.append(time.time() - start_time)
             # Save the data
             self.data_y.append(sample)
-
-            #print(self.data_y)
-
             # Update the viewport
             self.view.update_figure()
 
-            past_time = time.time()
+            # If the length of the list is too long then terminate the experiemnt
+            if len(self.data_x) > self.max_allowed_samples:
+                logger.warning(f'Maximum number of allowed samples ({self.max_allowed_samples}) reached, stopping sampling.')
+                self.stop_sampling()
 
-            
 
-        # Get the x data vector
-        self.data_x = np.arange(len(self.data_y)) * self.daq_parameters['sample_time']
+        # Increment the total measurement time
+        self.total_measurement_time += self.application_controller.readout_time
 
         logger.info('Sampling complete.')
         try:
             pass
         except Exception as e:
             logger.info(e)
-        # Enable the buttons
-        self.enable_buttons()
-
 
     def stop_sampling(self, tkinter_event: tk.Event = None):
+
+        # Catch if already stopped
+        if not self.application_controller.running:
+            return None
 
         logger.info('Stopping sampling.')
 
         # Set the running flag to false to stop after the next sample
         self.application_controller.running = False
 
+        # Enable the buttons
+        self.view.control_panel.start_button.config(state='normal')
+        self.view.control_panel.pause_button.config(state='disabled')
+        self.view.control_panel.reset_button.config(state='normal')
+        self.view.control_panel.save_button.config(state='normal')
 
     def reset_data(self, tkinter_event: tk.Event = None):
+
+        # Catch if already running
+        if self.application_controller.running:
+            return None
 
         logger.info('Resetting data.')
 
         # Reset the data variables
-        self.data_x = None
+        self.data_x = []
         self.data_y = []
+        self.total_measurement_time = 0
 
+        # Reset the figure
+        self.view.initialize_figure()
+
+        # Enable the buttons
+        self.enable_buttons()
+
+    def save_data(self, tkinter_event=None) -> None:
+        '''
+        Method to save the data, you can add more logic later for other filetypes.
+        The event input is to catch the tkinter event that is supplied but not used.
+        '''
+
+        # Catch if already running
+        if self.application_controller.running:
+            return None
+
+        allowed_formats = [('Image with dataset', '*.png'), ('Dataset', '*.hdf5')]
+
+        # Default filename
+        default_name = f'scope_{self.timestamp.strftime("%Y%m%d")}'
+            
+        # Get the savefile name
+        afile = tk.filedialog.asksaveasfilename(filetypes=allowed_formats, 
+                                                initialfile=default_name+'.png',
+                                                initialdir = self.last_save_directory)
+        # Handle if file was not chosen
+        if afile is None or afile == '':
+            logger.warning('File not saved!')
+            return # selection was canceled.
+
+        # Get the path
+        file_path = '/'.join(afile.split('/')[:-1])  + '/'
+        self.parent_application.last_save_directory = file_path # Save the last used file path
+        logger.info(f'Saving files to directory: {file_path}')
+        # Get the name with extension (will be overwritten)
+        file_name = afile.split('/')[-1]
+        # Get the filetype
+        file_type = file_name.split('.')[-1]
+        # Get the filename without extension
+        file_name = '.'.join(file_name.split('.')[:-1]) # Gets everything but the extension
+
+        # If the file type is .png, want to save image and hdf5
+        if file_type == 'png':
+            logger.info(f'Saving the PNG as {file_name}.png')
+            fig = self.view.data_viewport.fig
+            fig.savefig(file_path+file_name+'.png', dpi=300, bbox_inches=None, pad_inches=0)
+
+        # Save as hdf5
+        with h5py.File(file_path+file_name+'.hdf5', 'w') as df:
+            
+            logger.info(f'Saving the HDF5 as {file_name}.hdf5')
+            
+            # Save the file metadata
+            ds = df.create_dataset('file_metadata', 
+                                   data=np.array(['application', 
+                                                  'qdlutils_version',
+                                                  'timestamp'
+                                                  'original_name'], dtype='S'))
+            ds.attrs['application'] = 'qdlutils.qdlscope'
+            ds.attrs['qdlutils_version'] = qdlutils.__version__
+            ds.attrs['timestamp'] = self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+            ds.attrs['original_name'] = file_name
+
+            # Save the scan settings
+            # If your implementation settings vary you should change the attrs
+            ds = df.create_dataset('scan_settings/sample_time', data=self.daq_parameters['sample_time'])
+            ds.attrs['units'] = 'seconds'
+            ds.attrs['description'] = 'Time that the DAQ integrates counts over.'
+            ds = df.create_dataset('scan_settings/sample_time', data=self.daq_parameters['get_rate'])
+            ds.attrs['units'] = 'None'
+            ds.attrs['description'] = 'Boolean; if the recorded data is the rate.'
+
+            ds = df.create_dataset('data/sample_timestamps', data=self.data_x)
+            ds.attrs['units'] = 'seconds'
+            ds.attrs['description'] = 'Timestamp of each sample relative to the start of the sampling.'
+            ds = df.create_dataset('data/intensity', data=self.data_y)
+            if self._get_daq_config['get_rate']:
+                ds.attrs['units'] = 'counts per second'
+            else:
+                ds.attrs['units'] = 'counts'
+            ds.attrs['description'] = 'Intensity of samples.'
+            ds = df.create_dataset('data/total_measurement_time', data=self.total_measurement_time)
+            ds.attrs['units'] = 'seconds'
+            ds.attrs['description'] = 'Total time in seconds that samples were taken (not including pauses).'
 
     def configure_from_yaml(self, afile: str) -> None:
         '''
@@ -219,7 +343,6 @@ class ScopeApplication:
         yaml_path = importlib.resources.files(CONFIG_PATH).joinpath(yaml_filename)
         self.configure_from_yaml(str(yaml_path))
 
-
     def _get_daq_config(self) -> None:
         '''
         Gets the position parameters in the GUI and validates if they are allowable. 
@@ -232,6 +355,10 @@ class ScopeApplication:
         # Check if the sample time is too long or too short
         if (sample_time < 0.001) or (sample_time > 60):
             raise ValueError(f'Requested sample time {sample_time} is out of bounds (< 1 ms or > 60 s).')
+        
+        if sample_time < 0.01:
+            logger.warning(f'Requested sample time {sample_time}s is less than sample overhead.'
+                           +' The actual sample rate will not increase appreciably.')
 
         # Write to data memory
         self.daq_parameters = {
@@ -240,13 +367,9 @@ class ScopeApplication:
         }
 
 
-
-
-
 def main():
     tkapp = ScopeApplication(DEFAULT_CONFIG_FILE)
     tkapp.run()
-
 
 if __name__ == '__main__':
     main()
