@@ -28,13 +28,12 @@ class ScopeApplication:
         self.application_controller = None
 
         # Data
-        self.x_data = []
-        self.y_data = []
+        self.data_x = None
+        self.data_y = []
 
         # Plotting parameters
         self.max_samples_to_plot = 500
-        self.sample_time = None
-        self.batch_time = None
+        self.daq_parameters = None
 
         # Last save directory
         self.last_save_directory = None
@@ -45,32 +44,181 @@ class ScopeApplication:
         # Initialize the root tkinter widget (window housing GUI)
         self.root = tk.Tk()
         # Create the main application GUI
-        self.view = ScopeApplicationView(main_window=self.root)
+        self.view = ScopeApplicationView(main_window=self.root, application=self)
 
         # Bind the buttons
+        self.view.control_panel.start_button.bind("<Button>", self.start_continuous_sampling)
+        self.view.control_panel.pause_button.bind("<Button>", self.stop_sampling)
+        self.view.control_panel.reset_button.bind("<Button>", self.reset_data)
+        #self.view.control_panel.save_button.bind("<Button>", self.save_scan)
 
+    def run(self) -> None:
+        '''
+        This function launches the application including the GUI
+        '''
+        # Set the title of the app window
+        self.root.title("qdlscope")
+        # Display the window (not in task bar)
+        self.root.deiconify()
+        # Launch the main loop
+        self.root.mainloop()
 
-    def start(self, tkinter_event: tk.Event = None):
-        
+    def enable_buttons(self):
         pass
+
+    def disable_buttons(self):
+        pass
+
+    def start_continuous_sampling(self, tkinter_event: tk.Event = None):
+        
+        logger.info('Starting continuous sampling.')
+
+        # Disable the buttons
+        self.disable_buttons()
+
+        # Get the data
+        self._get_daq_config()
+
+        # Launch the thread
+        self.scan_thread = Thread(target=self.sample_continuous_thread_function)
+        self.scan_thread.start()
 
 
     def sample_continuous_thread_function(self) -> None:
+        #try:
+        logger.info('Starting continuous sampling thread.')
+
+        for sample in self.application_controller.read_counts_continuous(
+                            sample_time = self.daq_parameters['sample_time'], 
+                            get_rate = self.daq_parameters['get_rate']):
+            
+            # Save the data
+            self.data_y.append(sample)
+
+            #print(self.data_y)
+
+            # Update the viewport
+            self.view.update_figure()
+
+        # Get the x data vector
+        self.data_x = np.arange(len(self.data_y)) * self.daq_parameters['sample_time']
+
+        logger.info('Sampling complete.')
         try:
-            logger.info('Starting continuous sampling thread.')
-
-            for sample in self.application_controller.read_counts_continuous(
-                                self.sample_time, 
-                                self.get_rate):
-                
-                # Save the data
-                self.y_data.append(sample)
-
-                # Update the viewport
-                self.view.update_figure()
-
-            logger.info('Sampling complete.')
+            pass
         except Exception as e:
             logger.info(e)
         # Enable the buttons
-        self.parent_application.enable_buttons()
+        self.enable_buttons()
+
+
+    def stop_sampling(self, tkinter_event: tk.Event = None):
+
+        logger.info('Stopping sampling.')
+
+        # Set the running flag to false to stop after the next sample
+        self.application_controller.running = False
+
+
+    def reset_data(self, tkinter_event: tk.Event = None):
+
+        logger.info('Resetting data.')
+
+        # Reset the data variables
+        self.data_x = None
+        self.data_y = []
+
+
+    def configure_from_yaml(self, afile: str) -> None:
+        '''
+        This method loads a YAML file to configure the qdlmove hardware
+        based on yaml file indicated by argument `afile`.
+
+        This method instantiates and configures the counters and application
+        controller.
+
+        Parameters
+        ----------
+        afile: str
+            Full-path filename of the YAML config file.
+        '''
+        with open(afile, 'r') as file:
+            # Log selection
+            logger.info(f"Loading settings from: {afile}")
+            # Get the YAML config as a nested dict
+            config = yaml.safe_load(file)
+
+        # First we get the top level application name
+        APPLICATION_NAME = list(config.keys())[0]
+
+        # Get the names of the counter and positioners
+        hardware_dict = config[APPLICATION_NAME]['ApplicationController']['hardware']
+        counter_name = hardware_dict['counter']
+
+        # Get the counter, instantiate, and configure
+        import_path = config[APPLICATION_NAME][counter_name]['import_path']
+        class_name = config[APPLICATION_NAME][counter_name]['class_name']
+        module = importlib.import_module(import_path)
+        logger.debug(f"Importing {import_path}")
+        constructor = getattr(module, class_name)
+        counter = constructor()
+        counter.configure(config[APPLICATION_NAME][counter_name]['configure'])
+
+        # Get the application controller constructor 
+        import_path = config[APPLICATION_NAME]['ApplicationController']['import_path']
+        class_name = config[APPLICATION_NAME]['ApplicationController']['class_name']
+        module = importlib.import_module(import_path)
+        logger.debug(f"Importing {import_path}")
+        constructor = getattr(module, class_name)
+
+        # Create the application controller passing the hardware as kwargs.
+        self.application_controller = constructor(
+            **{'counter_controller': counter}
+        )
+
+    def load_yaml_from_name(self, yaml_filename: str) -> None:
+        '''
+        Loads the yaml configuration file from name.
+
+        Should be called during instantiation of this class and should be the callback
+        function for loading of other standard yaml files while running.
+
+        Parameters
+        ----------
+        yaml_filename: str
+            Filename of the .yaml file in the qdlscan/config_files path.
+        '''
+        yaml_path = importlib.resources.files(CONFIG_PATH).joinpath(yaml_filename)
+        self.configure_from_yaml(str(yaml_path))
+
+
+    def _get_daq_config(self) -> None:
+        '''
+        Gets the position parameters in the GUI and validates if they are allowable. 
+        Then saves the GUI input to the launcher application if valid.
+        '''
+
+        sample_time = float(self.view.control_panel.sample_time_entry.get())
+        get_rate = not(bool(self.view.control_panel.raw_counts_toggle.get()))
+        
+        # Check if the sample time is too long or too short
+        if (sample_time < 0.001) or (sample_time > 60):
+            raise ValueError(f'Requested sample time {sample_time} is out of bounds (< 1 ms or > 60 s).')
+
+        # Write to data memory
+        self.daq_parameters = {
+            'sample_time': sample_time,
+            'get_rate': get_rate,
+        }
+
+
+
+
+
+def main():
+    tkapp = ScopeApplication(DEFAULT_CONFIG_FILE)
+    tkapp.run()
+
+
+if __name__ == '__main__':
+    main()

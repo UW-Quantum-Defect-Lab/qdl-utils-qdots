@@ -75,9 +75,6 @@ class ScopeController:
         # Set the running flag
         self.running = True
 
-        # Configure the DAQ sampling time
-        self.counter_controller.configure_sample_time(sample_time=sample_time)
-
         # Set the scaling factor (equals 1 for getting counts explicitly or 1/sample_time
         # if returning the count rate). We do this out front so that each yield call does
         # not need to check if we must compute the rate.
@@ -89,13 +86,16 @@ class ScopeController:
         # Start up the counter
         self.counter_controller.start()
 
+        # Configure the DAQ sampling time
+        self.counter_controller.configure_sample_time(sample_time=sample_time)
+
         # Record the starting time
         start_time = time.time()
 
         while self.running:
 
             # While the counter is running, yield the counts, scaled by `scale`
-            yield (self.counter_controller.sample_batch_counts() / scale)
+            yield (self.counter_controller.sample_batch_counts() * scale)
 
         # Get the final time
         stop_time = time.time()
@@ -141,9 +141,6 @@ class ScopeController:
         # Set the running flag
         self.running = True
 
-        # Configure the DAQ sampling time
-        self.counter_controller.configure_sample_time(sample_time=sample_time)
-
         # Set the scaling factor (equals 1 for getting counts explicitly or 1/sample_time
         # if returning the count rate). We do this out front so that each yield call does
         # not need to check if we must compute the rate.
@@ -166,13 +163,16 @@ class ScopeController:
         # Start up the counter
         self.counter_controller.start()
 
+        # Configure the DAQ sampling time
+        self.counter_controller.configure_sample_time(sample_time=sample_time)
+
         # Record the starting time
         start_time = time.time()
 
         while self.running:
 
             # While the counter is running, yield the counts, scaled by `scale`
-            yield (self.counter_controller.sample_nbatches_counts(n_batches=n_samples) / scale)
+            yield (self.counter_controller.sample_nbatches_counts(n_batches=n_samples) * scale)
 
         # Get the final time
         stop_time = time.time()
