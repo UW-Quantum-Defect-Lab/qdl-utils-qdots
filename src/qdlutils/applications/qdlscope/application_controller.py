@@ -4,7 +4,6 @@ import time
 import numpy as np
 
 from qdlutils.hardware.nidaq.counters.nidaqtimedratecounter import NidaqTimedRateCounter
-from qdlutils.hardware.nidaq.analogoutputs.nidaqposition import NidaqPositionController
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)

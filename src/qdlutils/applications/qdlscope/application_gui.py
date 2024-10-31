@@ -13,9 +13,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 class ScopeApplicationView:
-
     '''
-    Main application GUI view, loads SidePanel and ScanImage
+    Main application GUI view, loads ScopeControlPanel and ScopeDataViewport which
+    show the parameters and buttons for controlling the application, and the data view.
     '''
     def __init__(self, 
                  main_window: tk.Tk, 
@@ -34,9 +34,10 @@ class ScopeApplicationView:
         # Initalize the figure
         self.initialize_figure()
 
-
-
     def initialize_figure(self) -> None:
+        '''
+        Initializes the data viewport figure to be ready for a sampling.
+        '''
 
         # Clear the axis
         self.data_viewport.ax.clear()
@@ -59,7 +60,7 @@ class ScopeApplicationView:
 
     def update_figure(self) -> None:
         '''
-        Update the figure
+        Update the figure with the current data
         '''
         # Clear the axis
         self.data_viewport.ax.clear()
@@ -80,6 +81,14 @@ class ScopeApplicationView:
 class ScopeControlPanel:
 
     def __init__(self, main_frame: tk.Frame):
+        '''
+        Initializes the control panel for the scope application window.
+
+        Parameters
+        ----------
+        main_frame : tk.Frame
+            The frame of the main window to pack the control pannel into.
+        '''
 
         # Define frame for scan configuration and control
         control_frame = tk.Frame(main_frame)
@@ -121,10 +130,17 @@ class ScopeControlPanel:
 
 class ScopeDataViewport:
 
-    def __init__(self, window):
+    def __init__(self, main_frame: tk.Frame):
+        '''
+        Initializes the data viewport for the scope application window.
 
+        Parameters
+        ----------
+        main_frame : tk.Frame
+            The frame of the main window to pack the control pannel into.
+        '''
         # Parent frame for control panel
-        frame = tk.Frame(window)
+        frame = tk.Frame(main_frame)
         frame.pack(side=tk.LEFT, padx=0, pady=0)
 
         self.fig = plt.figure()

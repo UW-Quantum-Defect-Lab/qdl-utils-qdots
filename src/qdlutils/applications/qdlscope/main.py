@@ -23,7 +23,11 @@ DEFAULT_CONFIG_FILE = 'qdlscope_base.yaml'
 
 class ScopeApplication:
     '''
-    
+    This class is main `qdlscope` application which handles the internal application
+    logic, coordinates the GUI, and queries the application controller for data.
+
+    Notes
+    -----
     Due to the implementation of the continuous scanning there is a slight overhead
     associated to each data sample which results in an increased time between samples.
 
@@ -34,16 +38,33 @@ class ScopeApplication:
 
     This discrepancy can be problematic if the scope sample times are of importance (for
     example, if one is trying to fit a slow exponential decay). Currently we handle this
-    by recording the total time between the start/stop of the 
+    by recording the total time between each start/stop of the scanning (not including
+    pauses and resetting on "reset"). Additionally we save the relative timetag of the
+    sample (technically the time at the end of the sample) to memory to get an
+    approximation of the sample timing. While this likely does not contribute much to the
+    computational overhead of each cycle it is likely suboptimal. Additional optimization
+    of the plotting functionality would also enable faster sampling rates.
 
-    There are a few ways of remedying this:
-        1.  One could simply generate the timestamp for each sample via `time.time()`
-            and then append this to the `self.data_x`.
-        2.  Change the plotting funciton to reduce the overhead further
-        3.  
+    The application controller is also set up to run "batched" samples wherein the user
+    may specify a "batch time" during which samples of length "sample time" are taken
+    sequentially using the low-level DAQ counting methods (see `NidaqTimedRateCounter`).
+    This would enable precise timing control as there is no computational overhead 
+    between samples as it is handled entirely by the DAQ. This would enable users to use
+    `qdlscope` as a "slow" timing board (limited only by the DAQ clock rate) for cases
+    where precise timing is required. Note, however, that this is currently not 
+    implemented within the application (this file) or the application GUI and must be
+    added separately. For more information see the comments in
+        `qdlscope.application_controller:read_counts_batches()`
     '''
 
-    def __init__(self, default_config_filename: str):
+    def __init__(self, default_config_filename: str) -> None:
+        '''
+        Parameters
+        ----------
+        default_config_filename : str
+            Name of the default YAML config file. The loader will look for this file in
+            the default path `CONFIG_PATH` defined at the top of this module. 
+        '''
         
         self.application_controller = None
 
@@ -92,7 +113,10 @@ class ScopeApplication:
         # Launch the main loop
         self.root.mainloop()
 
-    def enable_buttons(self):
+    def enable_buttons(self) -> None:
+        '''
+        Sets the buttons into the default configuration after resetting the scanner.
+        '''
         self.view.control_panel.sample_time_entry.config(state='normal')
         self.view.control_panel.raw_counts_checkbutton.config(state='normal')
         self.view.control_panel.start_button.config(state='normal')
@@ -100,7 +124,10 @@ class ScopeApplication:
         self.view.control_panel.reset_button.config(state='disabled')
         self.view.control_panel.save_button.config(state='disabled')
 
-    def disable_buttons(self):
+    def disable_buttons(self) -> None:
+        '''
+        Disables the buttons while running the sampler
+        '''
         self.view.control_panel.sample_time_entry.config(state='disabled')
         self.view.control_panel.raw_counts_checkbutton.config(state='disabled')
         self.view.control_panel.start_button.config(state='disabled')
@@ -108,8 +135,15 @@ class ScopeApplication:
         self.view.control_panel.reset_button.config(state='disabled')
         self.view.control_panel.save_button.config(state='disabled')
 
-    def start_continuous_sampling(self, tkinter_event: tk.Event = None):
-        
+    def start_continuous_sampling(self, tkinter_event: tk.Event = None) -> None:
+        '''
+        Callback function to start the sampling, appending data onto the current saved data.
+
+        Parameters
+        ----------
+        tkinter_event : tk.Event
+            The `tkinter` event (not used).
+        '''
         # Catch if already running
         if self.application_controller.running:
             return None
@@ -131,6 +165,9 @@ class ScopeApplication:
         self.scan_thread.start()
 
     def sample_continuous_thread_function(self) -> None:
+        '''
+        Sampling thread function which handles the data collection.
+        '''
         #try:
         logger.info('Starting continuous sampling thread.')
 
@@ -166,8 +203,15 @@ class ScopeApplication:
         except Exception as e:
             logger.info(e)
 
-    def stop_sampling(self, tkinter_event: tk.Event = None):
+    def stop_sampling(self, tkinter_event: tk.Event = None) -> None:
+        '''
+        Callback function to stop the sampling.
 
+        Parameters
+        ----------
+        tkinter_event : tk.Event
+            The `tkinter` event (not used).
+        '''
         # Catch if already stopped
         if not self.application_controller.running:
             return None
@@ -183,8 +227,15 @@ class ScopeApplication:
         self.view.control_panel.reset_button.config(state='normal')
         self.view.control_panel.save_button.config(state='normal')
 
-    def reset_data(self, tkinter_event: tk.Event = None):
+    def reset_data(self, tkinter_event: tk.Event = None) -> None:
+        '''
+        Callback function to reset the scanner, resetting the data and figure.
 
+        Parameters
+        ----------
+        tkinter_event : tk.Event
+            The `tkinter` event (not used).
+        '''
         # Catch if already running
         if self.application_controller.running:
             return None
@@ -206,6 +257,11 @@ class ScopeApplication:
         '''
         Method to save the data, you can add more logic later for other filetypes.
         The event input is to catch the tkinter event that is supplied but not used.
+        
+        Parameters
+        ----------
+        tkinter_event : tk.Event
+            The `tkinter` event (not used).
         '''
 
         # Catch if already running
