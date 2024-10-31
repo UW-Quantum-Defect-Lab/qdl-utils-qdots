@@ -792,7 +792,7 @@ class LineScanApplication:
             ds = df.create_dataset('data/count_rates', data=self.data_y)
             ds.attrs['units'] = 'Counts per second'
             ds.attrs['description'] = 'Count rates measured over scan.'
-            ds = df.create_dataset('data/counts', data=(self.data_y*self.time_per_pixel).astype(int))
+            ds = df.create_dataset('data/counts', data=self.data_y*self.time_per_pixel)
             ds.attrs['units'] = 'Counts'
             ds.attrs['description'] = 'Counts measured over scan.'
 
@@ -1058,7 +1058,7 @@ class ImageScanApplication():
             ds = df.create_dataset('data/count_rates', data=self.data_z)
             ds.attrs['units'] = 'Counts per second'
             ds.attrs['description'] = 'Count rates measured over 2-d scan.'
-            ds = df.create_dataset('data/counts', data=(self.data_z*self.time_per_pixel).astype(int))
+            ds = df.create_dataset('data/counts', data=self.data_z*self.time_per_pixel)
             ds.attrs['units'] = 'Counts'
             ds.attrs['description'] = 'Counts measured over 2-d scan.'
 
