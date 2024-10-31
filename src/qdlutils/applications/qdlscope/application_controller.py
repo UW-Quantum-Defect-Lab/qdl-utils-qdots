@@ -19,6 +19,9 @@ class ScopeController:
         
         self.counter_controller = counter_controller
 
+        # Time over which measurements were taken
+        self.readout_time = None
+
         # Flag to check if running
         self.running = False
 
@@ -86,10 +89,17 @@ class ScopeController:
         # Start up the counter
         self.counter_controller.start()
 
+        # Record the starting time
+        start_time = time.time()
+
         while self.running:
 
             # While the counter is running, yield the counts, scaled by `scale`
             yield (self.counter_controller.sample_batch_counts() / scale)
+
+        # Get the final time
+        stop_time = time.time()
+        self.readout_time = stop_time - start_time
 
         # Stop the counter
         self.counter_controller.stop()
@@ -100,7 +110,33 @@ class ScopeController:
                             get_rate: bool = True):
         '''
         This method reads out counts in discrete batches of length `batch_time` in
-        seconds.
+        seconds. This is useful in cases where the precise timing of the individual 
+        count samples in relation to each other is important. Recall that the
+        `self.read_counts_continuous()` method suffers from a slightly decreased sample
+        rate due (compared to the theoretical `1/sample_time` rate) to the overhead of 
+        communicating with the DAQ and passing data around.
+
+        This method works around this issue by scheduling readout of a set number of
+        samples sequentially and only handing data off to the software after each "batch"
+        lasting `batch_time` seconds long. This way, the overhead time cost only occurs
+        after each batch and so the timing between samples is preserved with in the
+        batch. Use this method if the exact timing between data points is important.
+
+        Parameters
+        ----------
+        sample_time : float
+            The time in seconds per sample on the DAQ board. Each data point in the 
+            output will correspond to this many seconds long.
+        batch_time : float
+            The length of time in seconds that samples are acquired over. Timing between
+            batches is not guaranteed as it depends on the computational overhead.
+        get_rate : bool
+            If `True` (default behavior), the return value will be the count rate.
+
+        Yields
+        ------
+        np.ndarray
+            A vector of the counts/count rate as a function of time over the batch.
         '''
         # Set the running flag
         self.running = True
@@ -130,10 +166,17 @@ class ScopeController:
         # Start up the counter
         self.counter_controller.start()
 
+        # Record the starting time
+        start_time = time.time()
+
         while self.running:
 
             # While the counter is running, yield the counts, scaled by `scale`
             yield (self.counter_controller.sample_nbatches_counts(n_batches=n_samples) / scale)
+
+        # Get the final time
+        stop_time = time.time()
+        self.readout_time = stop_time - start_time
 
         # Stop the counter
         self.counter_controller.stop()
