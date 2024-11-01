@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qdlutils"
-version = "v1.0.0prerelease"
+version = "v1.0.0"
 
 description = "A package for performing experiments in the quantum defect lab at UW."
 readme = "README.md"
@@ -66,6 +66,9 @@ dependencies = [
 qdlmove = "qdlutils.applications.qdlmove.main:main"
 qdlple = "qdlutils.applications.qdlple.main:main"
 qdlscan = "qdlutils.applications.qdlscan.main:main"
+qdlscope = "qdlutils.applications.qdlscope.main:main"
+qt3scan = "qdlutils.applications.qt3scan.main:main"
+qt3scope = "qdlutils.applications.qt3scope.main:main"
 
 [tool.setuptools.package-data]
-"qdlutils.applications.controllers" = ["*.yaml"]
+"*" = ["*.yaml"]
