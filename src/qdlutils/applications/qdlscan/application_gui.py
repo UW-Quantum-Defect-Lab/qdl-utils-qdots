@@ -327,6 +327,10 @@ class ImageScanApplicationView:
         self.data_viewport = ImageDataViewport(window=window)
         self.control_panel = ImageFigureControlPanel(window=window, settings_dict=settings_dict)
 
+        # Normalization for the figure
+        self.norm_min = None
+        self.norm_max = None
+
         # tkinter right click menu
         self.rclick_menu = tk.Menu(window, tearoff = 0) 
 
@@ -358,6 +362,9 @@ class ImageScanApplicationView:
         self.data_viewport.ax.set_ylabel(f'{self.application.axis_2} position (μm)', fontsize=14)
         self.data_viewport.cbar.ax.set_ylabel('Intensity (cts/s)', fontsize=14, rotation=270, labelpad=15)
         self.data_viewport.ax.grid(alpha=0.3)
+
+        if (self.norm_min is not None) and (self.norm_max is not None):
+            img.set_norm(plt.Normalize(vmin=self.norm_min, vmax=self.norm_max))
 
         # Plot the current position marker
         x, y, _ = self.application.application_controller.get_position()
@@ -446,3 +453,32 @@ class ImageFigureControlPanel:
         self.image_time_entry.insert(0, settings_dict['image_time'])
         self.image_time_entry.grid(row=row, column=1, padx=5, pady=2)
         self.image_time_entry.config(state='readonly')
+
+         # Scan settings view
+        image_settings_frame = tk.Frame(frame)
+        image_settings_frame.pack(side=tk.TOP, padx=0, pady=0)
+        # Single axis scan section
+        row = 0
+        tk.Label(image_settings_frame, 
+                 text='Image settings', 
+                 font='Helvetica 14').grid(row=row, column=0, pady=[10,5], columnspan=2)
+        # Minimum
+        row += 1
+        tk.Label(image_settings_frame, text='Minimum (cts/s)').grid(row=row, column=0, padx=5, pady=2)
+        self.image_minimum = tk.Entry(image_settings_frame, width=10)
+        self.image_minimum.insert(0, 0)
+        self.image_minimum.grid(row=row, column=1, padx=5, pady=2)
+        # Maximum
+        row += 1
+        tk.Label(image_settings_frame, text='Maximum (cts/s)').grid(row=row, column=0, padx=5, pady=2)
+        self.image_maximum = tk.Entry(image_settings_frame, width=10)
+        self.image_maximum.insert(0, 10000)
+        self.image_maximum.grid(row=row, column=1, padx=5, pady=2)
+        # Set normalization button
+        row += 1
+        self.norm_button = tk.Button(image_settings_frame, text='Normalize', width=15)
+        self.norm_button.grid(row=row, column=0, columnspan=2, pady=[5,1])
+        # Autonormalization button
+        row += 1
+        self.autonorm_button = tk.Button(image_settings_frame, text='Auto-normalize', width=15)
+        self.autonorm_button.grid(row=row, column=0, columnspan=2, pady=[1,1])

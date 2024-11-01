@@ -971,6 +971,8 @@ class ImageScanApplication():
         self.view.control_panel.pause_button.bind("<Button>", self.pause_scan)
         self.view.control_panel.continue_button.bind("<Button>", self.continue_scan)
         self.view.control_panel.save_button.bind("<Button>", self.save_scan)
+        self.view.control_panel.norm_button.bind("<Button>", self.set_normalize)
+        self.view.control_panel.autonorm_button.bind("<Button>", self.auto_normalize)
 
         # Setup the callback for rightclicks on the figure canvas
         self.view.data_viewport.canvas.mpl_connect('button_press_event', 
@@ -1232,6 +1234,30 @@ class ImageScanApplication():
             qdlscope.main()
         except Exception as e:
             logger.warning(f'{e}')
+
+    def set_normalize(self, tkinter_event: tk.Event = None) -> None:
+        # Get the value from the controller
+        norm_min = float(self.view.control_panel.image_minimum.get())
+        norm_max = float(self.view.control_panel.image_maximum.get())
+
+        if norm_min > norm_max:
+            raise ValueError(f'Minimum norm value {norm_min} > {norm_max}.')
+        if norm_min < 0:
+            raise ValueError(f'Minimum norm cannot be less than 0.')
+
+        # Save the minimum/maximum norm
+        self.view.norm_min = norm_min
+        self.view.norm_max = norm_max
+
+        self.view.update_figure()
+
+    def auto_normalize(self, tkinter_event: tk.Event = None) -> None:
+        # Save the minimum/maximum norm
+        self.view.norm_min = None
+        self.view.norm_max = None
+
+        self.view.update_figure()
+
 
 
 def main():
