@@ -1203,6 +1203,12 @@ class ImageScanApplication():
         self.application_controller.set_axis(axis=self.axis_2, position=self.start_position_axis_2)
 
     def open_rclick(self, mpl_event : tk.Event = None):
+        '''
+        This function is the callback for the matplotlib right click event on the figure
+        itself. It first gets and saves the x/y coordinate (in the data axes) and saves
+        it to the appliction. It then gets the Tkinter position of the mouse and uses
+        that to open a right click menu.
+        '''
         # Get the right click position in the matplotlib axis
         self.rclick_mpl_position_x = mpl_event.xdata
         self.rclick_mpl_position_y = mpl_event.ydata
@@ -1215,6 +1221,10 @@ class ImageScanApplication():
             self.view.rclick_menu.grab_release()
         
     def rclick_go_to(self):
+        '''
+        Method for the "go to" command in the right click menu. If a point within the 
+        figure axis has been clicked, then it attempts to move to that position.
+        '''
         # Make sure that the position of the right click is on the canvas
         if self.rclick_mpl_position_x and self.rclick_mpl_position_y:
             try:
@@ -1230,12 +1240,20 @@ class ImageScanApplication():
             logger.warning('Right click position out of axis.')
 
     def rclick_open_counter(self):
+        '''
+        Method for the "open counter" command in the right click menu. Opens an instance
+        of `qdlscope`.
+        '''
         try:
             qdlscope.main()
         except Exception as e:
             logger.warning(f'{e}')
 
     def set_normalize(self, tkinter_event: tk.Event = None) -> None:
+        '''
+        Callback function to set the normalization of the figure based off of the values
+        written to the GUI.
+        '''
         # Get the value from the controller
         norm_min = float(self.view.control_panel.image_minimum.get())
         norm_max = float(self.view.control_panel.image_maximum.get())
@@ -1252,6 +1270,9 @@ class ImageScanApplication():
         self.view.update_figure()
 
     def auto_normalize(self, tkinter_event: tk.Event = None) -> None:
+        '''
+        Callback function to autonormalize the figure.
+        '''
         # Save the minimum/maximum norm
         self.view.norm_min = None
         self.view.norm_max = None

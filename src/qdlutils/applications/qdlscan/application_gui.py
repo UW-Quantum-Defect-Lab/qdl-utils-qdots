@@ -363,6 +363,7 @@ class ImageScanApplicationView:
         self.data_viewport.cbar.ax.set_ylabel('Intensity (cts/s)', fontsize=14, rotation=270, labelpad=15)
         self.data_viewport.ax.grid(alpha=0.3)
 
+        # Normalize the figure if not already normalized
         if (self.norm_min is not None) and (self.norm_max is not None):
             img.set_norm(plt.Normalize(vmin=self.norm_min, vmax=self.norm_max))
 
@@ -482,3 +483,7 @@ class ImageFigureControlPanel:
         row += 1
         self.autonorm_button = tk.Button(image_settings_frame, text='Auto-normalize', width=15)
         self.autonorm_button.grid(row=row, column=0, columnspan=2, pady=[1,1])
+
+        # ===============================================================================
+        # Add more buttons or controls here
+        # ===============================================================================
