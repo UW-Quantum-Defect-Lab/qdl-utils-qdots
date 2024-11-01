@@ -12,24 +12,24 @@ solid-state optical emitters and spin-qubits:
 * TTL pulsers
   * Quantum Composer Sapphire
   * Spin Core PulseBlaster
-* Excelitas SPCM for photon detection
 * NI-DAQ card (PCIx 6363) for data acquisition and control
-  * Jena System's piezo actuator stage control amplifier
+  * Edge counting from Excelitas SPCM for photon detection
+  * Jena System's piezo actuator stage control
   * Mad City Labs piezo actuator stage control
 * Newport Micrometers via serial connection
 
 Additionally, several fully interfaced, Python applications are provided for 
 standard and commonly used experiments:
 
-* `qt3scope`: Real-time oscilloscope readout from the SPCM via the digital input 
-  terminal on the NI-DAQ board.
-* `qt3scan`: Reconfigurable 1-d and 2-d confocal scan imaging.
-* `qt3pb`: A simple GUI for controlling the pulse blaster.
-* `qdlple`: Reconfigurable resonant excitation (photoluminescence excitation)
-  spectroscopy. 
 * `qdlmove`: Customizable graphical interface for position control, reconfigurable 
   for mutltiple positioners.
-  
+* `qdlple`: Reconfigurable resonant excitation (photoluminescence excitation)
+  spectroscopy. 
+* `qdlscan`:  Reconfigurable 1-d and 2-d confocal scan imaging.
+* `qdlscope`: Real-time oscilloscope readout from the SPCM via the digital input 
+  terminal on the NI-DAQ board.
+
+as well as some legacy applications from `qt3-utils`.
 
 Applications are generally structured to be easily configured for different
 setups (using supported hardware) via the use of YAML files.
@@ -188,6 +188,12 @@ Upgrading Tcl/Tk via Anaconda overcomes some GUI bugs on Mac OS Sonoma
 ```
 conda install 'tk>=8.6.13'
 ```
+
+### Configuration
+
+
+## Using the software
+
 
 # LICENSE
 
