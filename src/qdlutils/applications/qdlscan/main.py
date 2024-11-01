@@ -16,6 +16,7 @@ from qdlutils.applications.qdlscan.application_gui import (
     LineScanApplicationView,
     ImageScanApplicationView
 )
+import qdlutils.applications.qdlscope.main as qdlscope
 
 logger = logging.getLogger(__name__)
 logging.basicConfig()
@@ -119,14 +120,15 @@ class LauncherApplication:
         self.view = LauncherApplicationView(main_window=self.root)
 
         # Bind the buttons
-        self.view.control_panel.image_start_button.bind("<Button>", self.start_image_scan)
-        self.view.control_panel.line_start_x_button.bind("<Button>", self.optimize_x_axis)
-        self.view.control_panel.line_start_y_button.bind("<Button>", self.optimize_y_axis)
-        self.view.control_panel.line_start_z_button.bind("<Button>", self.optimize_z_axis)
-        self.view.control_panel.x_axis_set_button.bind("<Button>", self.set_x_axis)
-        self.view.control_panel.y_axis_set_button.bind("<Button>", self.set_y_axis)
-        self.view.control_panel.z_axis_set_button.bind("<Button>", self.set_z_axis)
-        self.view.control_panel.get_position_button.bind("<Button>", self.get_coordinates)
+        self.view.control_panel.image_start_button.bind('<Button>', self.start_image_scan)
+        self.view.control_panel.line_start_x_button.bind('<Button>', self.optimize_x_axis)
+        self.view.control_panel.line_start_y_button.bind('<Button>', self.optimize_y_axis)
+        self.view.control_panel.line_start_z_button.bind('<Button>', self.optimize_z_axis)
+        self.view.control_panel.x_axis_set_button.bind('<Button>', self.set_x_axis)
+        self.view.control_panel.y_axis_set_button.bind('<Button>', self.set_y_axis)
+        self.view.control_panel.z_axis_set_button.bind('<Button>', self.set_z_axis)
+        self.view.control_panel.get_position_button.bind('<Button>', self.get_coordinates)
+        self.view.control_panel.open_counter_button.bind('<Button>', self.open_counter)
 
     def run(self) -> None:
         '''
@@ -463,6 +465,12 @@ class LauncherApplication:
         self.view.control_panel.y_axis_set_entry.insert(0, y)
         self.view.control_panel.z_axis_set_entry.insert(0, z)
 
+    def open_counter(self, tkinter_event=None) -> None:
+        try:
+            qdlscope.main()
+        except Exception as e:
+            logger.warning(f'{e}')
+
     def _get_scan_config(self) -> None:
         '''
         Gets the scan parameters in the GUI and validates if they are allowable. Then 
@@ -576,6 +584,8 @@ class LineScanApplication:
         self.range = range
         self.n_pixels = n_pixels
         self.time = time
+        self.rclick_mpl_position_x = None
+        self.rclick_mpl_position_y = None
 
         # Time per pixel
         self.time_per_pixel = time / n_pixels
@@ -640,6 +650,13 @@ class LineScanApplication:
         # Bind the buttons
         self.view.control_panel.save_button.bind("<Button>", self.save_scan)
 
+        # Setup the callback for rightclicks on the figure canvas
+        self.view.data_viewport.canvas.mpl_connect('button_press_event', 
+                                                   lambda event: self.open_rclick(event) if event.button == 3 else None)
+        # Set the commands for the right click
+        self.view.rclick_menu.add_command(label='Go to position', command=self.rclick_go_to) 
+        self.view.rclick_menu.add_separator() 
+        self.view.rclick_menu.add_command(label='Open counter') 
 
         # Launch the thread
         self.scan_thread = Thread(target=self.scan_thread_function)
@@ -689,6 +706,39 @@ class LineScanApplication:
         # Move to optmial position
         self.application_controller.set_axis(axis=self.axis, position=self.final_position_axis)
 
+    def open_rclick(self, mpl_event : tk.Event = None):
+        # Get the right click position in the matplotlib axis
+        self.rclick_mpl_position_x = mpl_event.xdata
+        self.rclick_mpl_position_y = mpl_event.ydata
+        # Get the tkinter x,y coordinates of the mouse
+        mouse_x, mouse_y = self.root.winfo_pointerxy()
+        # Open the popup menu with commands defined in the GUI file
+        try: 
+            self.view.rclick_menu.tk_popup(mouse_x,mouse_y) 
+        finally: 
+            self.view.rclick_menu.grab_release()
+        
+    def rclick_go_to(self):
+        # Make sure that the position of the right click is on the canvas
+        if self.rclick_mpl_position_x:
+            try:
+                # Go to the position on the voltage controller
+                self.application_controller.set_axis(axis=self.axis, position=self.rclick_mpl_position_x)
+                # Set the final position
+                self.final_position_axis = self.rclick_mpl_position_x
+                # Update the figure
+                self.view.update_figure()
+            except Exception as e:
+                logger.warning(f'Error in moving to position: {e}')
+        else:
+            logger.warning('Right click position out of axis.')
+
+    def rclick_open_counter(self):
+        try:
+            qdlscope.main()
+        except Exception as e:
+            logger.warning(f'{e}')
+  
     def _optimization_method_none(self) -> None:
         '''
         Internal method for determining the optimal position.
@@ -824,6 +874,8 @@ class ImageScanApplication():
         self.range = range
         self.n_pixels = n_pixels
         self.time = time
+        self.rclick_mpl_position_x = None
+        self.rclick_mpl_position_y = None
 
         # Time per pixel
         self.time_per_pixel = time / n_pixels
@@ -919,6 +971,14 @@ class ImageScanApplication():
         self.view.control_panel.pause_button.bind("<Button>", self.pause_scan)
         self.view.control_panel.continue_button.bind("<Button>", self.continue_scan)
         self.view.control_panel.save_button.bind("<Button>", self.save_scan)
+
+        # Setup the callback for rightclicks on the figure canvas
+        self.view.data_viewport.canvas.mpl_connect('button_press_event', 
+                                                   lambda event: self.open_rclick(event) if event.button == 3 else None)
+        # Set the commands for the right click
+        self.view.rclick_menu.add_command(label='Go to position', command=self.rclick_go_to) 
+        self.view.rclick_menu.add_separator() 
+        self.view.rclick_menu.add_command(label='Open counter', command=self.rclick_open_counter) 
 
         # Launch the thread
         self.scan_thread = Thread(target=self.start_scan_thread_function)
@@ -1140,11 +1200,43 @@ class ImageScanApplication():
         # Move to optmial position
         self.application_controller.set_axis(axis=self.axis_2, position=self.start_position_axis_2)
 
+    def open_rclick(self, mpl_event : tk.Event = None):
+        # Get the right click position in the matplotlib axis
+        self.rclick_mpl_position_x = mpl_event.xdata
+        self.rclick_mpl_position_y = mpl_event.ydata
+        # Get the tkinter x,y coordinates of the mouse
+        mouse_x, mouse_y = self.root.winfo_pointerxy()
+        # Open the popup menu with commands defined in the GUI file
+        try: 
+            self.view.rclick_menu.tk_popup(mouse_x,mouse_y) 
+        finally: 
+            self.view.rclick_menu.grab_release()
+        
+    def rclick_go_to(self):
+        # Make sure that the position of the right click is on the canvas
+        if self.rclick_mpl_position_x and self.rclick_mpl_position_y:
+            try:
+                # Move to optmial position
+                self.application_controller.set_axis(axis=self.axis_1, position=self.rclick_mpl_position_x)
+                # Move to optmial position
+                self.application_controller.set_axis(axis=self.axis_2, position=self.rclick_mpl_position_y)
+                # Update the figure
+                self.view.update_figure()
+            except Exception as e:
+                logger.warning(f'Error in moving to position: {e}')
+        else:
+            logger.warning('Right click position out of axis.')
+
+    def rclick_open_counter(self):
+        try:
+            qdlscope.main()
+        except Exception as e:
+            logger.warning(f'{e}')
+
 
 def main():
     tkapp = LauncherApplication(DEFAULT_CONFIG_FILE)
     tkapp.run()
-
 
 if __name__ == '__main__':
     main()

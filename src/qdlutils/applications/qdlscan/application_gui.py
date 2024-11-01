@@ -136,6 +136,10 @@ class LauncherControlPanel:
         row += 1
         self.get_position_button = tk.Button(daq_frame, text='Get current position', width=20)
         self.get_position_button.grid(row=row, column=0, columnspan=2, pady=[1,5])
+        # Get button
+        row += 1
+        self.open_counter_button = tk.Button(daq_frame, text='Open counter', width=20)
+        self.open_counter_button.grid(row=row, column=0, columnspan=2, pady=[5,5])
 
         ''' I do not think that we need to implement this since most people will not
             change settings dynamically. But, it can be added back in by uncommenting
@@ -154,6 +158,8 @@ class LauncherControlPanel:
         '''
 
 
+
+
 class LineScanApplicationView:
 
     def __init__(self, 
@@ -166,6 +172,9 @@ class LineScanApplicationView:
 
         self.data_viewport = LineDataViewport(window=window)
         self.control_panel = LineFigureControlPanel(window=window, settings_dict=settings_dict)
+
+        # tkinter right click menu
+        self.rclick_menu = tk.Menu(window, tearoff = 0) 
 
         # Initalize the figure
         self.initialize_figure()
@@ -223,7 +232,6 @@ class LineScanApplicationView:
 
         self.data_viewport.canvas.draw()
 
-
 class LineDataViewport:
 
     def __init__(self, window):
@@ -241,7 +249,6 @@ class LineDataViewport:
         toolbar.update()
         self.canvas._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self.canvas.draw()
-
 
 class LineFigureControlPanel:
 
@@ -320,6 +327,9 @@ class ImageScanApplicationView:
         self.data_viewport = ImageDataViewport(window=window)
         self.control_panel = ImageFigureControlPanel(window=window, settings_dict=settings_dict)
 
+        # tkinter right click menu
+        self.rclick_menu = tk.Menu(window, tearoff = 0) 
+
         # Initalize the figure
         self.update_figure()
 
@@ -327,7 +337,7 @@ class ImageScanApplicationView:
         # Clear the axis
         self.data_viewport.fig.clear()
         # Create a new axis
-        self.data_viewport.ax = plt.gca()
+        self.data_viewport.ax = self.data_viewport.fig.add_subplot(111)
 
         pixel_width = self.application.range / self.application.n_pixels
         extent = [self.application.min_position_1 - pixel_width/2, 
@@ -348,6 +358,10 @@ class ImageScanApplicationView:
         self.data_viewport.ax.set_ylabel(f'{self.application.axis_2} position (μm)', fontsize=14)
         self.data_viewport.cbar.ax.set_ylabel('Intensity (cts/s)', fontsize=14, rotation=270, labelpad=15)
         self.data_viewport.ax.grid(alpha=0.3)
+
+        # Plot the current position marker
+        x, y, _ = self.application.application_controller.get_position()
+        self.data_viewport.ax.plot(x,y,'o', fillstyle='none', markeredgecolor='#1864ab', markeredgewidth=2)
 
         self.data_viewport.canvas.draw()
 
