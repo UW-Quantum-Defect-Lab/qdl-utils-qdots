@@ -190,11 +190,108 @@ conda install 'tk>=8.6.13'
 ```
 
 ### Configuration
+The base installation of `qdlutils` contains some basic configuration files in the form
+of YAML files (`*.yaml`).
+Within any of the `qdlapp` family applications (e.g. `qldscope`), the configuration file is
+stored in the `qdlapp/config_files` directory (e.g. `qdlutils/qdlscope/config_files/*.yaml`).
+Each application has a base configuration file `qdlapp_base.yaml` which contains the
+default configuration for the hardware that is loaded by the application on startup.
+For example, the `qdlscope_base.yaml` file reads
+
+```
+QDLSCOPE:
+  ApplicationController:
+    import_path : qdlutils.applications.qdlscope.application_controller
+    class_name : ScopeController
+    hardware :
+      counter : Counter
+
+  Counter:
+    import_path : qdlutils.hardware.nidaq.counters.nidaqtimedratecounter
+    class_name  : NidaqTimedRateCounter
+    configure :
+      daq_name : Dev1               # NI DAQ Device Name
+      signal_terminal : PFI0        # DAQ Write channel
+      clock_terminal :              # Digital input terminal for external clock (blank if using internal)
+      clock_rate: 100000            # NI DAQ clock rate in Hz
+      sample_time_in_seconds : 1    # Sampling time in seconds (updates later in scan)
+      read_write_timeout : 10       # timeout in seconds for read/write operations
+      signal_counter : ctr2         # NIDAQ counter to use for count
+```
+
+The header `QDLSCOPE` signifies that the YAML file corresponds to the `qdlscope` application.
+When loading this file, the `qdlmove` application will read this file as a series of nested
+dictionaries (demarcated but indentation).
+The application then loads the hardware for the `Counter` using the class `class_name` defined 
+in `import_path`, which is then configured using the `configure` dictionary.
+Note that the structure of the YAML file for any given appliation will generally be different
+as it depends on the design of the configuration file loader within each application.
+Nevertheless, most configuration files are structured similarly.
+
+Users should modify the YAML configuration files to to match the hardware configuration in 
+their own systems.
+Modifying the base configuration files is expected and will set the default behavior.
+In some cases, the use of several different configurations (at different times) on the same
+system might be desired (e.g. for switching between different counters).
+All of the applications support the loading of YAML configuration files after startup,
+however not all applications have this feature enabled by default.
+In most cases this can be accomplished by some simple modificiation of the GUI and application
+classes (simply copying functions from other applications should suffice).
+Users may then create new YAML configuration files and save them in the `config_files` folder.
 
 
 ## Using the software
+Most applications can be run directly from the terminal via commands installed with `qdlutils`.
+The currently supported commands are:
+
+```
+qdlmove
+qdlple
+qdlscan
+qdlscope
+qt3scan
+qt3scope
+```
+
+of which each open their respective applications.
+Alternatively one can run the `main.py` file of the relevant application directly (or call 
+its method `main()` in another script).
+
+If a one-off experiment is desired then it is also possible to call the hardware classes
+or even application controllers (e.g. in `qdlapp/application_controller.py`) on their own.
+The `qdlutils` package already has some base experiments provided in `qdlutils.experiemnts`,
+however these files are (in the current version), legacy code from `qt3utils`, and may
+consequently require modification.
 
 
-# LICENSE
+## LICENSE
 
-[LICENCE](LICENSE)
+[BSD 3-Clause License](LICENSE)
+
+Copyright (c) 2022, University of Washington
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
