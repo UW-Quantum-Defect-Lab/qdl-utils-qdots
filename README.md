@@ -212,9 +212,9 @@ QDLSCOPE:
     configure :
       daq_name : Dev1               # NI DAQ Device Name
       signal_terminal : PFI0        # DAQ Write channel
-      clock_terminal :              # Digital input terminal for external clock (blank if using internal)
+      clock_terminal :              # Digital input terminal for external clock
       clock_rate: 100000            # NI DAQ clock rate in Hz
-      sample_time_in_seconds : 1    # Sampling time in seconds (updates later in scan)
+      sample_time_in_seconds : 1    # Sampling time in seconds (updates via GUI)
       read_write_timeout : 10       # timeout in seconds for read/write operations
       signal_counter : ctr2         # NIDAQ counter to use for count
 ```
@@ -262,6 +262,8 @@ or even application controllers (e.g. in `qdlapp/application_controller.py`) on 
 The `qdlutils` package already has some base experiments provided in `qdlutils.experiemnts`,
 however these files are (in the current version), legacy code from `qt3utils`, and may
 consequently require modification.
+Applications need not be created in the `qdlutils` package itself as all hardware classes
+may be called from any location via standard imports.
 
 
 ## LICENSE
