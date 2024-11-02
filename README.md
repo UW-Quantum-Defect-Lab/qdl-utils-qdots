@@ -262,7 +262,7 @@ or even application controllers (e.g. in `qdlapp/application_controller.py`) on 
 The `qdlutils` package already has some base experiments provided in `qdlutils.experiemnts`,
 however these files are (in the current version), legacy code from `qt3utils`, and may
 consequently require modification.
-Applications need not be created in the `qdlutils` package itself as all hardware classes
+Experiments need not be created in the `qdlutils` package itself as all hardware classes
 may be called from any location via standard imports.
 
 
