@@ -32,12 +32,15 @@ class MainTkApplication():
     '''
     Main application backend, launches the GUI and handles events
     '''
-    def __init__(self, default_config_filename) -> None:
+    def __init__(self, default_config_filename: str, is_root_process: bool) -> None:
         '''
         Initializes the application.
         Args:
             controller_name (str) : name of controller used to identify the YAML config
         '''
+        # Boolean if the function is the root or not, determines if the application is
+        # intialized via tk.Tk or tk.Toplevel
+        self.is_root_process = is_root_process
 
         # Define class attributes to store data aquisition and controllers
         self.wavelength_controller_model = None
@@ -56,7 +59,10 @@ class MainTkApplication():
         self.load_controller_from_name(yaml_filename=default_config_filename)
 
         # Initialize the root tkinter widget (window housing GUI)
-        self.root = tk.Tk()
+        if self.is_root_process:
+            self.root = tk.Tk()
+        else:
+            self.root = tk.Toplevel()
         # Create the main application GUI and specify the controller name
         self.view = MainApplicationView(self, 
                                         scan_range=[self.wavelength_controller_model.min_voltage, 
@@ -73,8 +79,10 @@ class MainTkApplication():
         # Turn off the repump laser at startup
         self.toggle_repump_laser(cmd=False)
 
-        # Set protocol for shutdown when the root tkinter widget is closed
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        # Set protocol for shutdown when the root tkinter widget is closed (if root process)
+        if self.is_root_process:
+            self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
 
     def go_to(self, event=None) -> None:
         '''
@@ -405,7 +413,8 @@ class MainTkApplication():
         # Display the window (not in task bar)
         self.root.deiconify()
         # Launch the main loop
-        self.root.mainloop()
+        if self.is_root_process:
+            self.root.mainloop()
 
 
     def on_closing(self) -> None:
@@ -644,8 +653,10 @@ class ScanPopoutApplication():
         self.root.destroy()
 
 
-def main() -> None:
-    tkapp = MainTkApplication(DEFAULT_CONFIG_FILE)
+def main(is_root_process=True) -> None:
+    tkapp = MainTkApplication(
+        default_config_filename=DEFAULT_CONFIG_FILE,
+        is_root_process=is_root_process)
     tkapp.run()
 
 
