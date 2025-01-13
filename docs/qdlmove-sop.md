@@ -1,7 +1,7 @@
 # `qdlmove`
 
 `qdlmove` is a simple application for getting, setting, and stepping different axes of the various positioners used in a microscope setup. 
-It has a generic structure capable being augmented to include additional positioners of different types.
+It has a generic structure capable being augmented to include additional positioners of different types (not necessarily just stage control but also automated mirrors, galvos, etc.).
 
 ## Configuration and start up
 The base version of the `qdlmove` is configured for one two-dimensional positioner (usually the micrometers or "micros") and one three-dimensional positioner (labeled "piezos").
@@ -82,6 +82,9 @@ Then supply the names of the axis controllers defined in the YAML file to the ar
 Finally, `read_precision` simply specifies the number of decimals to print out in the GUI.
 
 ## General usage
+
+![image](./images/sop_qdlmove.PNG)
+
 The application opens a GUI enabling you to input the position value and step size.
 The current position is readout continuously (everytime it is updated) as well.
 Once the desired position along a specific axis is placed into the GUI input element, the user may press the "Set position" button to drive the axes to the specific location.
@@ -93,3 +96,42 @@ For three-dimensional positioners the `z` axis is linked to the equals/plus `=`/
 These work with number pad keys as well.
 
 ## Advanced topics
+
+This section contains additional information required to modify the program itself.
+As `qdlmove` is intended to be quite general, this is generally pertinent information for most users.
+
+### Structure of the program
+Like the other programs in `qdlutils`, the program is broken into three components: (1) a `main` which handles the back end of the application itself, (2) an `application_gui` which defines the application front end, and (3) an `application_controller` which interfaces the application with the hardware itself.
+The reason for this separation is so that different hardware types can be "unified" at the `application_controller` level so that the application itself (in `main`) only needs to know about the `application_controller`.
+You will find each of these components as their own `.py` files in `qdlmove`.
+
+`main` contains the definitions of the `TwoAxisApplicationControl` and `ThreeAxisApplicationControl` classes with define the interfacing of the GUI input to commands sent to the `MovementController` class in `application_controller.py`.
+The `TwoAxisApplicationControl` and `ThreeAxisApplicationControl` contain two or three functionally identical axes respectively.
+The axes are more or less identical except for the keybinds.
+Unfortunately, proper initialization of the system is not straightforwardly achieved (some hardware such as the NIDAQ voltage outputs do not store their current values).
+As such some additional steps are taken to initialize the positions of the hardware on startup.
+These are contained in the `isinstance()` checks at the end of the `__init__()` class methods.
+
+The `MovementController` class in `application_controller.py` contains a ***dictionary*** of the classes representing actual hardware positioners called `MovementController.positioners`.
+The names provided in the `.yaml` and definition of the `TwoAxisApplicationControl` and `ThreeAxisApplicationControl` classes in `main` correspond to the keys of the `MovementController.positioners` dictionary, with values of the keys being the class representing the specified hardware.
+When `main` requests movement of an axis, the `MovementController.move_axis()` and `MovementController.step_axis()` methods are called passing the name of the desired positioner and information about the desired movement.
+In the current implementation, these methods are effectively wrappers for the hardware class methods `.go_to_position(position)` and `.step_position(dx)`.
+All existing and relevant hardware classes have such methods defined.
+
+### Adding new hardware
+To add new hardware one must define an appropriate controller class of the hardware.
+This class can be stored in `qdlutils.hardware` under the relevant subdirectory.
+Serial-based connections can be based off of `qdlutils.hardware.micrometers.newportmicrometer.py`.
+New types of hardware may require separate development.
+In any case, the current code is designed to call hardware class methods `.go_to_position(position)` and `.step_position(dx)` with argument signatures as shown.
+
+
+If for some reason you need to operate with hardware classes with other call signatures for these types of motion (or without either of these methods), then the suggested solution would be to write a wrapper class for the desired hardware that implements methods with these call signatures and load this wrapper class with the `.yaml` file.
+This could be achieved by inheriting from the original class, instantiating with a `super().__init__()` call, then writing new methods `.go_to_position(position)` and `.step_position(dx)`.
+If either of these methods do not have a direct analog (e.g. if the hardware does not support absolute positioning), then you can simply write a null version of the method which does nothing.
+This will prevent `qdlmove` from thowing an error.
+
+Finally, you must also implement the logic for initialization in the two main classes of main `TwoAxisApplicationControl` and `ThreeAxisApplicationControl`.
+If you need additional axes (or only one), then new classes can be written in `main`, e.g. `FourAxisApplicationControl`, which are effectively copy-pasted versions of the original two.
+In the future, it might be ideal to have a new class `OneAxisApplicationControl` which the former, multi-axis classes simply instantiate multiple copies.
+However we do not implement this now.
