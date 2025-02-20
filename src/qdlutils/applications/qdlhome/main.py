@@ -11,7 +11,7 @@ logging.basicConfig()
 
 class HomeApplication:
     '''
-    This is the base application for qdlhome.
+    This is the base application for qdlhome. Start this for all other apps. 
 
     It serves as basic lanucher for each of the different applications. Note that there
     are no special protections coded into the application to prevent user error due to 
