@@ -49,8 +49,8 @@ def switch():
         is_on = True
  
 # Define Our Images
-on = PhotoImage(file = "C:\Users\SiV Microscope\Documents\qdl-utils-qdots\src\qdlutils\hardware\nidaq\digitaloutputs\on.png")
-off = PhotoImage(file = "C:\Users\SiV Microscope\Documents\qdl-utils-qdots\src\qdlutils\hardware\nidaq\digitaloutputs\off.png")
+on = PhotoImage(file = "C:/Users/SiV Microscope/Documents/qdl-utils-qdots/src/qdlutils/hardware/nidaq/digitaloutputs/on.png")
+off = PhotoImage(file = "C:/Users/SiV Microscope/Documents/qdl-utils-qdots/src/qdlutils/hardware/nidaq/digitaloutputs/off.png")
  
 # Create A Button
 on_button = Button(root, image = on, bd = 0,
